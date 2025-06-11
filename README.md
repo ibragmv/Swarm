@@ -1,4 +1,4 @@
-## Introduction - Hack Recon (Pentest GPT)
+## Introduction - HackRecon (Pentest GPT)
 
 HackRecon is an innovative assistant for penetration testing, we used the `OpenHermes-2.5-Mistral-7B` model, we jailbroke it, finetuned it with commands for popular Kali Linux tools and it's now able to provide guided, actionable steps and command automation for performing deep pen tests.
 We've launched the updated model here - https://huggingface.co/ArmurAI/Pentest_AI
