@@ -863,7 +863,7 @@ class BaseTool(ABC):
 - Training: 3 epochs, batch size 4, gradient accumulation 8, cosine LR schedule
 - Evaluation: held-out 5k sample test set; measure `AttackSurface` JSON validity rate, field accuracy
 - Target: >95% valid JSON output, >90% field extraction accuracy vs Claude-generated ground truth
-- Publish: `AutoPentestAI/recon-agent-qwen2.5-7b` on HuggingFace Hub
+- Publish: `ArmurAI/recon-agent-qwen2.5-7b` on HuggingFace Hub
 
 #### Classifier Model Fine-Tuning (`training/train_classifier.py`)
 - Base model: `mistralai/Mistral-7B-Instruct-v0.3`
@@ -871,7 +871,7 @@ class BaseTool(ABC):
 - Same LoRA config, 2 epochs
 - Evaluation: CVE mapping accuracy, CVSS score mean absolute error, false positive recall
 - Target: >85% CVE mapping accuracy, CVSS MAE <0.5, >90% false positive recall
-- Publish: `AutoPentestAI/classifier-agent-mistral-7b`
+- Publish: `ArmurAI/classifier-agent-mistral-7b`
 
 #### Exploit Model Fine-Tuning (`training/train_exploit.py`)
 - Base model: `deepseek-ai/DeepSeek-R1-Distill-Llama-8B` (R1 reasoning in an 8B model)
@@ -879,7 +879,7 @@ class BaseTool(ABC):
 - LoRA config: `r=128` (higher rank for complex reasoning task), 3 epochs
 - Evaluation: attack plan validity rate, step sequence coherence, technique-finding alignment
 - Target: >85% valid `AttackPlan` JSON, expert evaluation score >4/5 on 200 sampled outputs
-- Publish: `AutoPentestAI/exploit-agent-deepseek-r1-8b`
+- Publish: `ArmurAI/exploit-agent-deepseek-r1-8b`
 
 #### Report Model Fine-Tuning (`training/train_report.py`)
 - Base model: `meta-llama/Llama-3.1-8B-Instruct`
@@ -887,7 +887,7 @@ class BaseTool(ABC):
 - 2 epochs, focus on instruction following and format consistency
 - Evaluation: BLEU/ROUGE vs reference reports, human evaluation on 100 sampled reports
 - Target: ROUGE-L >0.6, human evaluation >4/5 on professionalism + completeness
-- Publish: `AutoPentestAI/report-agent-llama3.1-8b`
+- Publish: `ArmurAI/report-agent-llama3.1-8b`
 
 #### Model Registry (`models/registry.py`)
 - Implement `ModelRegistry`: tracks available models, versions, download status
@@ -991,7 +991,7 @@ class BaseTool(ABC):
 | Web UI | React 18 + TypeScript + shadcn/ui |
 | Recon Tools | nmap, subfinder, httpx, ffuf, whatweb, nuclei, gau, amass |
 | Deployment | Docker + docker-compose |
-| Model Hosting | HuggingFace Hub (AutoPentestAI org) |
+| Model Hosting | HuggingFace Hub (`ArmurAI` org) |
 | CI/CD | GitHub Actions |
 
 ---
