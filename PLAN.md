@@ -1,130 +1,114 @@
 # Auto-Pentest-GPT-AI
 ### Autonomous AI-Powered Penetration Testing Platform
 
-> A multi-agent AI system that autonomously performs full-cycle penetration tests — from recon through exploitation through professional reporting — powered by four specialized fine-tuned open source models coordinated by an orchestrator agent.
+> A multi-agent AI system built in Go that autonomously performs full-cycle penetration tests — from continuous recon through exploitation through professional reporting — powered by four specialized fine-tuned open source models coordinated by an orchestrator agent.
 
 ---
 
 ## Vision
 
-Most security tools collect data or execute commands. None of them *think*. Auto-Pentest-GPT-AI is the first platform built around a multi-agent AI architecture where each agent is a specialist — fine-tuned on a best-in-class open source model for its specific task — coordinated by an orchestrator that plans the campaign and synthesizes the results.
+Most security tools collect data or execute commands. None of them *think*. Auto-Pentest-GPT-AI is the first Go-native platform built around a multi-agent AI architecture where each agent is a specialist — fine-tuned on a best-in-class open source model for its specific task — coordinated by an orchestrator that plans the campaign, adapts in real-time, and produces evidence-backed findings.
 
-The result: a penetration test that runs autonomously from target input to final report, with the reasoning quality of an experienced pentester.
-
----
-
-## The Problem
-
-Penetration testing today is:
-- **Expensive** — skilled pentesters are scarce and charge $200-400/hour
-- **Infrequent** — most organizations test once a year, missing changes in attack surface
-- **Manual** — tools generate data; humans do all the thinking
-- **Inconsistent** — quality varies massively by individual tester skill
-
-Existing automated tools (Metasploit, Burp, Nuclei) are powerful but narrow. They don't reason. They don't chain findings. They don't adapt. They don't explain. They produce data dumps, not intelligence.
+**What makes this different from every existing tool:**
+- Four proprietary fine-tuned models purpose-built for security tasks (not general LLMs with a system prompt)
+- Go-native: single binary, fast, concurrent, ships as `brew install`
+- Continuous ASM: watches your scope, detects new assets, auto-triggers targeted tests
+- Bug bounty workflow: reads HackerOne/Bugcrowd scope, avoids duplicate submissions, generates program-compliant reports
+- Full privacy: runs 100% locally with Ollama — nothing leaves your machine
 
 ---
 
-## The Architecture
+## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                      USER INTERFACE                              │
-│              (CLI + Web UI + REST API)                           │
-└─────────────────────────────┬───────────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    ORCHESTRATOR AGENT                            │
-│                                                                  │
-│  Model: Claude API  OR  Large Local LLM (user's choice)         │
-│  e.g. claude-opus-4-6 | llama3.1:70b | qwen2.5:72b via Ollama  │
-│                                                                  │
-│  Responsibilities:                                               │
-│  • Plans the full campaign given target + objective              │
-│  • Dispatches tasks to specialist agents                         │
-│  • Synthesizes outputs into a coherent attack narrative          │
-│  • Makes high-level decisions: pursue path A or B, stop or       │
-│    continue, escalate or pivot                                   │
-│  • Handles novel situations outside specialist training          │
-└──────┬──────────────┬──────────────┬──────────────┬─────────────┘
-       │              │              │              │
-       ▼              ▼              ▼              ▼
-┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐
-│   RECON    │ │ CLASSIFIER │ │  EXPLOIT   │ │  REPORT    │
-│   AGENT    │ │   AGENT    │ │   AGENT    │ │   AGENT    │
-│            │ │            │ │            │ │            │
-│ Qwen 2.5   │ │ Mistral 7B │ │ DeepSeek   │ │ Llama 3.1  │
-│ 7B         │ │ (fine-     │ │ R1 8B      │ │ 8B         │
-│ (fine-     │ │ tuned)     │ │ (fine-     │ │ (fine-     │
-│ tuned)     │ │            │ │ tuned)     │ │ tuned)     │
-└────────────┘ └────────────┘ └────────────┘ └────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                     DISTRIBUTION LAYER                            │
+│   brew install | curl install.sh | docker compose | npx           │
+└───────────────────────────────┬──────────────────────────────────┘
+                                 │
+┌───────────────────────────────▼──────────────────────────────────┐
+│                      Go CLI (Cobra)                               │
+│   autopentest scan | campaign | watch | report | doctor           │
+└───────────────────────────────┬──────────────────────────────────┘
+                                 │ HTTP/WebSocket
+┌───────────────────────────────▼──────────────────────────────────┐
+│                   Go Backend (single binary)                      │
+│                                                                   │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │                  ORCHESTRATOR AGENT                          │ │
+│  │         Claude API  OR  Large Local LLM via Ollama           │ │
+│  │  ReAct loop · Campaign planning · Agent coordination         │ │
+│  └────────┬──────────┬──────────┬──────────┬───────────────────┘ │
+│           │          │          │          │                      │
+│           ▼          ▼          ▼          ▼                      │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐           │
+│  │  RECON   │ │CLASSIFIER│ │ EXPLOIT  │ │  REPORT  │           │
+│  │  AGENT   │ │  AGENT   │ │  AGENT   │ │  AGENT   │           │
+│  │ Qwen 2.5 │ │Mistral 7B│ │DeepSeek  │ │Llama 3.1 │           │
+│  │   7B     │ │fine-tuned│ │R1 8B     │ │  8B      │           │
+│  │fine-tuned│ │          │ │fine-tuned│ │fine-tuned│           │
+│  └────┬─────┘ └──────────┘ └──────────┘ └──────────┘           │
+│       │                                                           │
+│       ▼  (native Go libraries, no subprocess)                    │
+│  subfinder · httpx · nuclei · naabu · katana · dnsx · gau        │
+│                                                                   │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │  Continuous ASM Engine                                    │   │
+│  │  scope watcher · asset diff · auto-trigger               │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│                                                                   │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │  Bug Bounty Workflow                                      │   │
+│  │  HackerOne API · Bugcrowd API · dedup · report format    │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│                                                                   │
+│  FastHTTP API · PostgreSQL + pgvector · Redis · Docker API        │
+└──────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
+│              React + TypeScript Web Dashboard                     │
+│   Live agent thoughts · Attack surface map · Campaign history    │
+└──────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
+│         Python (offline · separate · one-time only)              │
+│   Fine-tuning pipeline → ArmurAI/* on HuggingFace Hub           │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Agent Responsibilities
+## Agent Roster
 
-### Agent 1 — Orchestrator
-**Model:** Claude API (`claude-opus-4-6`) or large local LLM (Llama 3.1 70B, Qwen 2.5 72B via Ollama/LM Studio) — **user's choice**
-
-The brain of the system. Doesn't execute techniques directly — it plans, coordinates, and synthesizes. Receives structured outputs from all specialist agents and makes campaign-level decisions. This is where frontier reasoning capability matters most, which is why it runs on the most capable available model.
-
-### Agent 2 — Recon Agent
-**Base model:** Qwen 2.5 7B (fine-tuned)
-**Why Qwen:** Best-in-class structured data understanding at 7B scale, 128k context window for large recon dumps, exceptional at parsing heterogeneous tool output formats.
-
-Takes raw output from recon tools (nmap, subfinder, httpx, whatweb, ffuf, etc.) and produces a structured, normalized attack surface model. Correlates findings across tools — the same host appearing in multiple tool outputs becomes one enriched record, not three separate findings.
-
-### Agent 3 — Classifier Agent
-**Base model:** Mistral 7B (fine-tuned)
-**Why Mistral:** Extremely efficient at classification tasks, low latency, strong instruction following.
-
-Sits between Recon and Exploit agents. Takes individual findings from the attack surface model and classifies each one: maps to CVE IDs where applicable, assigns CVSS score, filters false positives, ranks by severity and exploitability, tags with relevant attack categories (OWASP Top 10, ATT&CK). Offloads structured classification from both neighboring agents, making the whole pipeline more accurate.
-
-### Agent 4 — Exploit Agent
-**Base model:** DeepSeek R1 8B (fine-tuned)
-**Why DeepSeek R1:** R1's chain-of-thought reasoning architecture is remarkable at this scale — it genuinely reasons through multi-step problems rather than just pattern matching. Critical for the hardest task in the pipeline: constructing multi-step attack chains from a classified attack surface.
-
-Takes the classified attack surface from the Classifier Agent and constructs ranked attack paths. Knows CVE-to-exploitation mappings, technique chaining, and when/how to escalate from one finding to the next. Returns ordered attack plan with specific commands to the Orchestrator.
-
-### Agent 5 — Report Agent
-**Base model:** Llama 3.1 8B (fine-tuned)
-**Why Llama 3.1:** Meta's strongest model at this scale for long-form structured writing, excellent instruction following, consistent professional tone — exactly what report generation requires.
-
-Takes all confirmed findings, evidence, and context accumulated during the campaign and generates a complete professional penetration test report: executive summary, technical findings with CVSS scores, attack narrative, evidence screenshots/output, and prioritized remediation recommendations.
+| Agent | Model | Role |
+|---|---|---|
+| **Orchestrator** | Claude API or large local LLM (user's choice) | Plans campaign, coordinates agents, synthesizes results, adapts to findings |
+| **Recon Agent** | `ArmurAI/recon-agent-qwen2.5-7b` | Runs and interprets recon tools, builds structured attack surface model |
+| **Classifier Agent** | `ArmurAI/classifier-agent-mistral-7b` | Maps findings to CVEs, CVSS scoring, false positive filtering, severity ranking |
+| **Exploit Agent** | `ArmurAI/exploit-agent-deepseek-r1-8b` | Constructs multi-step attack chains, suggests exploitation techniques, adapts on feedback |
+| **Report Agent** | `ArmurAI/report-agent-llama3.1-8b` | Generates professional pentest reports in multiple formats |
 
 ---
 
-## LLM Provider Configuration
+## Technology Stack
 
-Users configure their preferred provider once:
-
-```yaml
-# config.yaml
-orchestrator:
-  provider: claude          # claude | ollama | lmstudio
-  model: claude-opus-4-6    # or llama3.1:70b, qwen2.5:72b, etc.
-  api_key: sk-ant-...       # required if provider: claude
-  endpoint: null            # required if provider: ollama/lmstudio
-
-specialist_agents:
-  # These always run locally — privacy by default
-  recon:
-    model: autopentest-recon-qwen2.5-7b
-    endpoint: http://localhost:11434   # Ollama
-  classifier:
-    model: autopentest-classifier-mistral-7b
-    endpoint: http://localhost:11434
-  exploit:
-    model: autopentest-exploit-deepseek-r1-8b
-    endpoint: http://localhost:11434
-  report:
-    model: autopentest-report-llama3.1-8b
-    endpoint: http://localhost:11434
-```
-
-The specialist agents always run locally — they handle sensitive target data and raw findings. Only the orchestrator's traffic (high-level planning, no raw target data) goes to Claude API if the user chooses that path.
+| Component | Technology | Reason |
+|---|---|---|
+| Platform language | Go 1.22 | Single binary, goroutine concurrency, native security tool libraries |
+| Agent framework | Custom (~400 lines) | Full control, no framework overhead, cleaner architecture |
+| LLM — Claude | `anthropic-sdk-go` | Official Go SDK |
+| LLM — Local | Ollama REST API (`/api/chat`) | Standard local model serving |
+| Security tools | Native Go libraries | subfinder, httpx, nuclei, naabu, katana — no subprocess overhead |
+| API | `fasthttp` + `fiber` | High performance HTTP |
+| Real-time | WebSocket (gorilla/websocket) | Agent thought streaming to CLI + UI |
+| Database | PostgreSQL 16 + pgvector | Campaign history + semantic search |
+| Cache | Redis 7 | Session state, rate limiting |
+| Container execution | Docker API (docker/docker client-go) | Isolated tool execution |
+| Web dashboard | React 18 + TypeScript + shadcn/ui | Clean, fast, embeddable |
+| CLI | Cobra + lipgloss + bubbletea | Beautiful terminal UI |
+| Fine-tuning | Python + Unsloth + QLoRA | Offline, GPU machine only |
+| Model hosting | HuggingFace Hub (`ArmurAI` org) | Consistent with existing `ArmurAI/Pentest_AI` |
+| Distribution | Homebrew + Docker Compose + npx + pip SDK | All tiers covered |
 
 ---
 
@@ -132,138 +116,143 @@ The specialist agents always run locally — they handle sensitive target data a
 
 ```
 auto-pentest-gpt-ai/
-├── orchestrator/               # Orchestrator agent
-│   ├── agent.py                # Main ReAct agent loop
-│   ├── planner.py              # Campaign planning logic
-│   ├── coordinator.py          # Dispatches tasks to specialist agents
-│   ├── providers/              # LLM provider abstractions
-│   │   ├── base.py             # Abstract LLMProvider
-│   │   ├── claude.py           # Anthropic SDK integration
-│   │   ├── ollama.py           # Ollama local integration
-│   │   └── lmstudio.py         # LM Studio integration
-│   └── tools/                  # Orchestrator tool definitions
-├── agents/                     # Specialist agents
-│   ├── base.py                 # Abstract SpecialistAgent
-│   ├── recon/
-│   │   ├── agent.py            # Recon agent logic
-│   │   ├── tools/              # Tool execution wrappers
-│   │   │   ├── nmap.py
-│   │   │   ├── subfinder.py
-│   │   │   ├── httpx.py
-│   │   │   ├── ffuf.py
-│   │   │   ├── whatweb.py
-│   │   │   ├── nuclei.py
-│   │   │   ├── gau.py
-│   │   │   └── amass.py
-│   │   └── parser.py           # Normalizes tool outputs
-│   ├── classifier/
-│   │   ├── agent.py            # Classifier agent logic
-│   │   ├── cve_mapper.py       # Finding → CVE mapping
-│   │   └── scorer.py           # CVSS scoring
-│   ├── exploit/
-│   │   ├── agent.py            # Exploit agent logic
-│   │   ├── path_builder.py     # Attack path construction
-│   │   └── executor.py         # Command execution engine
-│   └── report/
-│       ├── agent.py            # Report agent logic
-│       ├── templates/          # Report format templates
-│       └── renderer.py         # PDF/HTML/Markdown output
-├── models/                     # Fine-tuned model management
-│   ├── registry.py             # Model download/version tracking
-│   └── pull.py                 # Pull models from HuggingFace Hub
-├── pipeline/                   # Campaign orchestration
-│   ├── campaign.py             # Campaign state machine
-│   ├── state.py                # State definitions
-│   └── context.py              # Shared campaign context
-├── scope/                      # Scope enforcement
-│   ├── validator.py            # Target validation
-│   └── authorization.py        # Authorization token management
-├── api/                        # REST API (FastAPI)
-│   ├── main.py
-│   └── routers/
-├── web/                        # React frontend
-├── cli/                        # Click CLI
-│   └── main.py
-├── data/                       # Training data generation (fine-tuning)
-│   ├── recon/                  # Recon agent training data
-│   ├── classifier/             # Classifier agent training data
-│   ├── exploit/                # Exploit agent training data
-│   └── report/                 # Report agent training data
-├── training/                   # Fine-tuning scripts
-│   ├── generate_data.py        # Synthetic data generation via Claude
+├── cmd/
+│   └── autopentest/
+│       └── main.go              # CLI entrypoint
+├── internal/
+│   ├── agent/
+│   │   ├── orchestrator/        # Orchestrator ReAct loop
+│   │   │   ├── agent.go
+│   │   │   ├── planner.go
+│   │   │   ├── coordinator.go
+│   │   │   └── memory.go
+│   │   ├── recon/               # Recon agent
+│   │   │   ├── agent.go
+│   │   │   └── parser.go
+│   │   ├── classifier/          # Classifier agent
+│   │   │   ├── agent.go
+│   │   │   ├── cve.go
+│   │   │   └── scorer.go
+│   │   ├── exploit/             # Exploit agent
+│   │   │   ├── agent.go
+│   │   │   ├── pathbuilder.go
+│   │   │   └── executor.go
+│   │   └── report/              # Report agent
+│   │       ├── agent.go
+│   │       └── renderer.go
+│   ├── llm/
+│   │   ├── provider.go          # LLMProvider interface
+│   │   ├── claude.go            # Anthropic SDK
+│   │   ├── ollama.go            # Ollama REST
+│   │   └── lmstudio.go          # LM Studio OpenAI-compat
+│   ├── tools/                   # Native Go security tool wrappers
+│   │   ├── subfinder.go
+│   │   ├── httpx.go
+│   │   ├── nuclei.go
+│   │   ├── naabu.go
+│   │   ├── katana.go
+│   │   ├── dnsx.go
+│   │   └── gau.go
+│   ├── pipeline/
+│   │   ├── campaign.go          # Campaign state machine
+│   │   ├── context.go           # Shared campaign context + data models
+│   │   └── cleanup.go           # Cleanup registry
+│   ├── asm/
+│   │   ├── watcher.go           # Continuous ASM scope watcher
+│   │   ├── diff.go              # Asset diff engine
+│   │   └── trigger.go           # Auto-campaign trigger
+│   ├── bugbounty/
+│   │   ├── hackerone.go         # HackerOne API client
+│   │   ├── bugcrowd.go          # Bugcrowd API client
+│   │   ├── dedup.go             # Duplicate finding detection
+│   │   └── formatter.go         # Program-compliant report format
+│   ├── scope/
+│   │   ├── validator.go         # Target scope validation
+│   │   └── auth.go              # Authorization tokens
+│   ├── api/
+│   │   ├── server.go            # Fiber HTTP server
+│   │   ├── routes.go
+│   │   ├── handlers/
+│   │   └── ws/                  # WebSocket hub
+│   ├── db/
+│   │   ├── postgres.go
+│   │   ├── migrations/
+│   │   └── queries/             # sqlc-generated query code
+│   └── config/
+│       └── config.go            # Config loading + validation
+├── cli/
+│   ├── root.go
+│   ├── campaign.go
+│   ├── scan.go
+│   ├── report.go
+│   ├── models.go
+│   ├── doctor.go
+│   └── ui/                      # bubbletea TUI components
+├── web/                         # React dashboard
+│   ├── src/
+│   │   ├── pages/
+│   │   ├── components/
+│   │   └── hooks/
+│   └── dist/                    # Built assets, embedded in Go binary
+├── training/                    # Python fine-tuning (offline)
+│   ├── generate_data.py
 │   ├── train_recon.py
 │   ├── train_classifier.py
 │   ├── train_exploit.py
 │   └── train_report.py
+├── data/                        # Synthetic training datasets
+│   ├── recon/
+│   ├── classifier/
+│   ├── exploit/
+│   └── report/
+├── docs/                        # Documentation
+│   ├── quickstart.md
+│   ├── architecture.md
+│   ├── cli-reference.md
+│   ├── api-reference.md
+│   ├── configuration.md
+│   ├── providers.md
+│   ├── bug-bounty.md
+│   ├── continuous-asm.md
+│   └── fine-tuning.md
+├── deploy/
+│   ├── docker-compose.yml
+│   ├── docker-compose.gpu.yml
+│   ├── helm/
+│   └── homebrew/
 ├── tests/
-├── docker/
-│   ├── Dockerfile.controller
-│   └── docker-compose.yml
+│   ├── unit/
+│   ├── integration/
+│   └── e2e/
+├── .github/
+│   └── workflows/
+│       ├── ci.yml
+│       └── release.yml
+├── Makefile
+├── go.mod
+├── go.sum
 ├── config.example.yaml
-├── requirements.txt
-└── setup.py
+└── README.md
 ```
 
 ---
 
-## Campaign Flow (End to End)
+## Campaign Flow
 
 ```
-1. User provides: target domain/IP + objective + scope definition
-
-2. ORCHESTRATOR: Plans campaign
-   → Determines recon depth based on target type
-   → Sets campaign milestones: recon → classify → exploit → report
-
-3. RECON AGENT: Executes recon tools in parallel
-   → subfinder (subdomain enumeration)
-   → nmap (port + service scanning)
-   → httpx (HTTP probing, tech detection)
-   → whatweb (technology fingerprinting)
-   → gau (historical URL discovery)
-   → ffuf (directory/endpoint fuzzing)
-   → nuclei (lightweight vuln scanning)
-   → Parses all output → builds normalized AttackSurface model
-   → Returns structured AttackSurface to Orchestrator
-
-4. ORCHESTRATOR: Reviews attack surface
-   → Prioritizes most interesting findings
-   → Dispatches to Classifier Agent
-
-5. CLASSIFIER AGENT: Classifies each finding
-   → Maps findings to CVE IDs
-   → Assigns CVSS scores
-   → Filters false positives
-   → Ranks by exploitability
-   → Returns ClassifiedFindingSet to Orchestrator
-
-6. ORCHESTRATOR: Reviews classified findings
-   → Makes strategic decisions: which paths to pursue
-   → Dispatches to Exploit Agent with prioritized findings
-
-7. EXPLOIT AGENT: Constructs attack paths
-   → Reasons through attack chains
-   → Suggests specific techniques + commands per finding
-   → Returns RankedAttackPlan to Orchestrator
-
-8. ORCHESTRATOR: Executes attack plan
-   → Approves each step
-   → Runs commands via exploit executor
-   → Feeds results back to Exploit Agent
-   → Exploit Agent adapts plan based on results
-   → Loop continues until objective reached or all paths exhausted
-
-9. ORCHESTRATOR: Determines campaign complete
-   → Compiles all findings, evidence, command outputs
-   → Dispatches to Report Agent
-
-10. REPORT AGENT: Generates professional report
-    → Executive summary
-    → Technical findings with evidence
-    → Attack narrative
-    → CVSS-scored vulnerability list
-    → Remediation recommendations
-    → Delivers report in user's chosen format (PDF/HTML/Markdown)
+1.  User: target + objective + scope
+2.  Orchestrator: plan campaign, set milestones
+3.  Recon Agent: run tools natively (subfinder, httpx, nuclei, naabu, katana, dnsx, gau)
+                 → analyze output → return AttackSurface
+4.  Classifier Agent: map CVEs, score CVSS, filter false positives
+                      → return ClassifiedFindingSet
+5.  Orchestrator: review findings, select attack paths
+6.  Exploit Agent: build ranked AttackPlan with chain-of-thought reasoning
+7.  Orchestrator: execute steps → feed results back → Exploit Agent adapts
+8.  Loop until objective reached or all paths exhausted
+9.  Report Agent: generate professional report (PDF/HTML/Markdown/JSON)
+10. [If bug bounty mode]: format for program, dedup, submit or export
+11. [If ASM mode]: schedule next scan, diff against previous, alert on new findings
 ```
 
 ---
@@ -272,746 +261,1406 @@ auto-pentest-gpt-ai/
 
 ---
 
-### Sprint 0 — Project Setup & Foundation
+### Sprint 0 — Project Foundation & Developer Experience
 **Duration:** 1 week
-**Goal:** Clean professional project structure, working local dev environment, every engineer productive in under 10 minutes.
+**Goal:** Clean professional Go project that any engineer can clone and run in under 10 minutes. Every structural and tooling decision locked in before a line of product code is written.
 
-**Why this sprint matters:** The existing repo is a single Python file. We're building a professional platform. Establishing clean structure, tooling, and conventions now prevents accumulating debt across every subsequent sprint.
+**Why this sprint matters:** We're replacing a single Python file with a production Go platform. Getting the structure, tooling, and conventions right now prevents accumulating technical debt that compounds across every subsequent sprint.
 
-#### Repository Cleanup & Structure
-- Archive `PentestAI.py` → `legacy/PentestAI.py` (preserve history, don't delete)
-- Archive `Pentest_LLM.gguf` reference → document in `legacy/README.md`
-- Create full directory structure as defined in Repository Structure above
-- Initialize all `__init__.py` files, stub modules with docstrings
-- Update root `README.md`: new architecture overview, quick start guide, agent descriptions
+#### 0.1 Repository Cleanup
+- Move `PentestAI.py` → `legacy/PentestAI.py` with a comment at the top explaining it is the original prototype
+- Move `Pentest_LLM.gguf` reference → `legacy/README.md` documenting the original model approach
+- Move `requirement.txt` → `legacy/requirements.txt`
+- Create root `.gitignore` covering: Go binaries, `.env`, `config.yaml`, `*.gguf`, `node_modules`, `dist`, `__pycache__`, `.DS_Store`
+- Create root `LICENSE` (Apache 2.0) with correct copyright header
 
-#### Python Project Setup
-- Set up `pyproject.toml`: project metadata, dependencies, tool configs
-- Configure `ruff` (linting), `black` (formatting), `mypy` (type checking)
-- Configure `pytest` + `pytest-asyncio` for async test support
-- Set up `pre-commit` hooks: ruff, black, mypy, `detect-secrets`
-- Create `requirements.txt` split into:
-  - `requirements/base.txt` — core runtime deps
-  - `requirements/dev.txt` — dev + testing deps
-  - `requirements/training.txt` — fine-tuning deps (heavy: torch, unsloth, etc.)
+#### 0.2 Go Project Initialization
+- Initialize Go module: `go mod init github.com/Armur-Ai/auto-pentest-gpt-ai`
+- Create full directory structure as defined in Repository Structure above — all directories with `.gitkeep` files
+- Write root `go.mod` with Go 1.22 minimum version
+- Add initial dependencies to `go.mod`:
+  - `github.com/spf13/cobra` — CLI framework
+  - `github.com/gofiber/fiber/v2` — HTTP server
+  - `github.com/gorilla/websocket` — WebSocket
+  - `github.com/charmbracelet/bubbletea` — terminal UI
+  - `github.com/charmbracelet/lipgloss` — terminal styling
+  - `github.com/anthropics/anthropic-sdk-go` — Claude API
+  - `github.com/jackc/pgx/v5` — PostgreSQL driver
+  - `github.com/redis/go-redis/v9` — Redis client
+  - `github.com/spf13/viper` — config management
+  - `go.uber.org/zap` — structured logging
+  - `github.com/stretchr/testify` — test assertions
 
-#### Local Development Environment
-- Write `docker-compose.yml`: Ollama (serves local models), PostgreSQL (campaign history), Redis (task queue), the API server with hot reload
-- Write `config.example.yaml`: all configuration options documented with descriptions and defaults
-- Write `scripts/setup.sh`: installs Ollama, pulls placeholder models, sets up DB, runs seed data
-- Write `Makefile` with targets: `make dev`, `make test`, `make lint`, `make build-agent`
+#### 0.3 Code Quality Tooling
+- Create `.golangci.yml` with linters enabled: `errcheck`, `gosimple`, `govet`, `ineffassign`, `staticcheck`, `unused`, `gofmt`, `goimports`, `misspell`, `gocritic`
+- Create `Makefile` with targets:
+  - `make build` — compile binary to `./bin/autopentest`
+  - `make dev` — start full local stack via docker compose + run binary with hot reload via `air`
+  - `make test` — run unit tests with race detector (`go test -race ./...`)
+  - `make test-integration` — run integration tests (requires running services)
+  - `make lint` — run golangci-lint
+  - `make fmt` — run gofmt + goimports
+  - `make generate` — run sqlc generate + any other code generation
+  - `make docs` — generate API docs from code
+  - `make clean` — remove build artifacts
+- Create `.air.toml` for hot reload during development (Air tool)
+- Set up pre-commit hooks: `golangci-lint`, `gofmt` check, `go mod tidy` check, `detect-secrets`
 
-#### Core Config & Logging
-- Implement `config.py` using `pydantic-settings`: loads from `config.yaml` + env vars, validates all required fields on startup
-- Implement `logging.py` using `structlog`: structured JSON logging, campaign ID propagated in all log lines
-- Implement `exceptions.py`: `ScopeViolation`, `AgentError`, `ToolExecutionError`, `ModelUnavailable`, `AuthorizationError`
+#### 0.4 Configuration System (`internal/config/config.go`)
+- Define `Config` struct with all configuration fields, grouped by section:
+  ```go
+  type Config struct {
+      Server      ServerConfig
+      Database    DatabaseConfig
+      Redis       RedisConfig
+      Orchestrator OrchestratorConfig  // provider + model + api key
+      Agents      AgentsConfig         // per-agent model endpoints
+      Tools       ToolsConfig          // tool timeouts, flags, wordlists
+      Scope       ScopeConfig          // default scope settings
+      ASM         ASMConfig            // continuous ASM settings
+      BugBounty   BugBountyConfig      // HackerOne/Bugcrowd API keys
+  }
+  ```
+- Implement `Load(path string) (*Config, error)` using Viper: reads from `config.yaml` file, overridable via env vars prefixed `AUTOPENTEST_`
+- Implement `Validate(c *Config) error`: checks all required fields are set, URLs are valid, model names are non-empty
+- Write `config.example.yaml`: every field documented with inline comments explaining purpose, valid values, and default
 
-#### Scope Enforcement (Build First)
-- Implement `scope/validator.py`:
-  - `ScopeDefinition`: list of allowed IP ranges (CIDR), allowed domains, allowed ports
-  - `validate_target(target: str, scope: ScopeDefinition) -> bool`
-  - `validate_command(command: str, scope: ScopeDefinition) -> bool` — parses command for embedded IPs/domains, checks each against scope
-  - **Every tool execution MUST call `validate_target` before running. Hard failure on violation.**
-- Implement `scope/authorization.py`: simple authorization token (signed JSON with campaign ID, scope, expiry, operator name) — required to start any campaign
+#### 0.5 Structured Logging (`internal/logger/logger.go`)
+- Initialize `go.uber.org/zap` in production mode (JSON output) or development mode (human-readable), switchable via config
+- Implement `WithCampaignID(ctx, id)`, `WithAgentName(ctx, name)`, `WithTechnique(ctx, technique)` context propagation helpers
+- Every log line in the application must carry: `campaign_id` (if in a campaign), `agent` (if in an agent), `level`, `timestamp`, `message`
+
+#### 0.6 Error Types (`internal/errors/errors.go`)
+- Define sentinel errors: `ErrScopeViolation`, `ErrAuthRequired`, `ErrAgentFailed`, `ErrToolNotFound`, `ErrModelUnavailable`, `ErrCampaignAborted`, `ErrRateLimitExceeded`
+- Implement `WrapToolError(tool, err)`, `WrapAgentError(agent, err)` for structured error context
+- All errors implement `error` interface and carry structured fields for logging
+
+#### 0.7 Local Development Environment
+- Write `deploy/docker-compose.dev.yml`: PostgreSQL 16, Redis 7, Ollama (with model pull on startup), the Go API server (compiled binary, mounted from `./bin/`), the React dev server (Vite)
+- Write `deploy/docker-compose.test.yml`: isolated services for integration testing, ephemeral volumes
+- Write `scripts/setup.sh`: installs Go tooling (air, sqlc, golangci-lint), runs `docker compose up -d`, waits for services healthy, runs DB migrations, seeds test data
+- Write `scripts/seed.go`: creates 2 test campaigns with mock data, 1 test environment, 2 test API keys
+
+#### 0.8 Scope Enforcement (Build Before Anything Else)
+- Implement `internal/scope/validator.go`:
+  - `ScopeDefinition` struct: `AllowedCIDRs []string`, `AllowedDomains []string`, `AllowedPorts []int`
+  - `func Validate(target string, scope ScopeDefinition) error`: parses target as IP or domain, checks against each CIDR/domain in scope, returns `ErrScopeViolation` with target and scope details if not allowed
+  - `func ValidateCommand(cmd string, scope ScopeDefinition) error`: extracts all IPs and domains from a command string using regex, validates each — rejects the command if any target is out of scope
+  - **This function is called by every tool wrapper and executor before running. No exceptions.**
+- Write `tests/unit/scope_test.go`: table-driven tests covering in-scope IP, out-of-scope IP, in-scope domain, out-of-scope domain, CIDR boundary cases
+
+#### 0.9 CI Pipeline (`.github/workflows/ci.yml`)
+- Trigger: every PR and push to `main`
+- Jobs (run in parallel where independent):
+  - `lint`: run golangci-lint
+  - `test`: run `go test -race ./...`, upload coverage to Codecov
+  - `build`: compile binary for Linux amd64, verify it runs `--version`
+  - `docker`: build Docker image, verify it starts
 
 **Acceptance Criteria:**
-- [ ] `make dev` produces running local stack with no manual steps
-- [ ] `make test` runs empty test suite and passes
-- [ ] Attempting to target an out-of-scope IP raises `ScopeViolation`
-- [ ] `config.example.yaml` covers all configuration options
+- [ ] `git clone && make dev` produces a running local stack with zero manual steps
+- [ ] `make test` runs and passes (even with empty test suites)
+- [ ] `make lint` passes with zero warnings
+- [ ] `config.example.yaml` documents every config field
+- [ ] Calling `scope.Validate("192.168.99.1", scope)` against a scope of `10.0.0.0/24` returns `ErrScopeViolation`
+- [ ] CI pipeline runs green on a new PR
 
 **Dependencies:** None
 
 ---
 
-### Sprint 1 — LLM Provider Abstraction Layer
+### Sprint 1 — LLM Provider Abstraction
 **Duration:** 1 week
-**Goal:** Build the unified LLM interface that every agent talks to — Claude, Ollama, or LM Studio, transparently.
+**Goal:** A single, clean Go interface for all LLM providers — Claude, Ollama, LM Studio. Every agent talks to this interface. Swapping providers requires only a config change.
 
-**Why this sprint matters:** Every agent in the system sends prompts and receives responses. If the provider abstraction is wrong, changing it later means touching every agent. Get this interface right once.
+**Why this sprint matters:** Every agent in the platform sends prompts and receives responses. If the provider abstraction is wrong, changing it later means touching every agent. One week of investment here saves weeks of refactoring later.
 
-#### Abstract Provider Interface (`orchestrator/providers/base.py`)
-- Define `LLMProvider` abstract base class:
-  ```python
-  class LLMProvider(ABC):
-      @abstractmethod
-      async def complete(self, messages: list[Message], tools: list[Tool] | None = None,
-                         stream: bool = False) -> CompletionResponse: ...
-
-      @abstractmethod
-      async def stream(self, messages: list[Message], tools: list[Tool] | None = None
-                       ) -> AsyncIterator[str]: ...
-
-      @abstractmethod
-      async def health_check(self) -> bool: ...
-
-      @property
-      @abstractmethod
-      def supports_tool_use(self) -> bool: ...
-
-      @property
-      @abstractmethod
-      def context_window(self) -> int: ...
+#### 1.1 Provider Interface (`internal/llm/provider.go`)
+- Define `Provider` interface:
+  ```go
+  type Provider interface {
+      Complete(ctx context.Context, req CompletionRequest) (*CompletionResponse, error)
+      Stream(ctx context.Context, req CompletionRequest) (<-chan StreamChunk, error)
+      HealthCheck(ctx context.Context) error
+      ModelName() string
+      ContextWindow() int
+      SupportsToolUse() bool
+  }
   ```
-- Define `Message(role, content)`, `Tool(name, description, parameters)`, `CompletionResponse(content, tool_calls, usage)` Pydantic models
-- Define `ToolCall(tool_name, arguments)`, `Usage(input_tokens, output_tokens)` models
+- Define `CompletionRequest`: `Messages []Message`, `Tools []Tool`, `MaxTokens int`, `Temperature float64`, `SystemPrompt string`
+- Define `Message`: `Role string` (system/user/assistant/tool), `Content string`, `ToolCallID string` (for tool results)
+- Define `Tool`: `Name string`, `Description string`, `Parameters json.RawMessage` (JSON Schema)
+- Define `ToolCall`: `ID string`, `Name string`, `Arguments string` (raw JSON)
+- Define `CompletionResponse`: `Content string`, `ToolCalls []ToolCall`, `Usage Usage`, `StopReason string`
+- Define `StreamChunk`: `Delta string`, `ToolCallDelta *ToolCallDelta`, `Done bool`
+- Define `Usage`: `InputTokens int`, `OutputTokens int`
 
-#### Claude Provider (`orchestrator/providers/claude.py`)
-- Implement `ClaudeProvider(LLMProvider)` using `anthropic` Python SDK
-- Support all Claude models: `claude-opus-4-6`, `claude-sonnet-4-6`, `claude-haiku-4-5`
-- Implement tool use via Anthropic's tool calling API
-- Implement streaming via `stream=True` on `messages.create`
-- Implement token budget management: warn when approaching context window
-- Implement retry with exponential backoff on rate limit errors (429)
-- Track usage per campaign in DB for cost monitoring
+#### 1.2 Claude Provider (`internal/llm/claude.go`)
+- Implement `ClaudeProvider` using `anthropic-sdk-go`
+- `Complete`: call `client.Messages.New()` with mapped request fields; map response back to `CompletionResponse`
+- `Stream`: call `client.Messages.NewStreaming()`; iterate events, emit `StreamChunk` per delta; close channel on `message_stop`
+- Tool use: map `Tool` structs to Anthropic `ToolParam`; parse `ToolUseBlock` responses into `ToolCall` structs
+- Retry logic: exponential backoff on 429 (rate limit) and 529 (overloaded), max 3 retries, jitter added
+- Usage tracking: after every `Complete` call, write `Usage` record to DB with `campaign_id`, `agent_name`, `model`, `input_tokens`, `output_tokens`, `timestamp`
+- Write `tests/unit/llm/claude_test.go`: mock HTTP server returning canned responses; test `Complete`, `Stream`, tool call parsing, retry on 429
 
-#### Ollama Provider (`orchestrator/providers/ollama.py`)
-- Implement `OllamaProvider(LLMProvider)` using `httpx` async client against Ollama REST API
-- `POST /api/chat` with `model`, `messages`, `stream` params
-- Implement tool use via JSON mode + parsing (Ollama doesn't have native tool calling for all models — implement structured output parsing as fallback)
-- Health check: `GET /api/tags` to verify Ollama is running and model is pulled
-- Implement `pull_model(model_name)` convenience method: `POST /api/pull`
+#### 1.3 Ollama Provider (`internal/llm/ollama.go`)
+- Implement `OllamaProvider` using `net/http` against Ollama's REST API
+- `Complete`: `POST /api/chat` with `model`, `messages`, `stream: false`; parse response JSON into `CompletionResponse`
+- `Stream`: `POST /api/chat` with `stream: true`; read newline-delimited JSON stream; emit `StreamChunk` per line
+- Tool use: Ollama supports native tool calling for some models; implement JSON-mode fallback for models that don't — parse structured JSON from completion content
+- `HealthCheck`: `GET /api/tags`; verify model name appears in response; return descriptive error if Ollama not running or model not pulled
+- `PullModel(ctx, name)`: `POST /api/pull`; stream progress back to caller
+- Write `tests/unit/llm/ollama_test.go`: mock Ollama server; test all methods
 
-#### LM Studio Provider (`orchestrator/providers/lmstudio.py`)
-- Implement `LMStudioProvider(LLMProvider)` using OpenAI-compatible API that LM Studio exposes
-- `POST /v1/chat/completions` — identical to OpenAI format
-- Use `openai` Python SDK with `base_url` pointed at local LM Studio server
-- Health check: `GET /v1/models` to verify server is running and model is loaded
+#### 1.4 LM Studio Provider (`internal/llm/lmstudio.go`)
+- Implement `LMStudioProvider` using OpenAI-compatible API that LM Studio exposes
+- `POST /v1/chat/completions` — identical schema to OpenAI; use `sashabaranov/go-openai` library with `BaseURL` set to LM Studio endpoint
+- `HealthCheck`: `GET /v1/models`; verify server responds and at least one model is loaded
+- Write `tests/unit/llm/lmstudio_test.go`
 
-#### Provider Factory (`orchestrator/providers/factory.py`)
-- Implement `create_provider(config: OrchestratorConfig) -> LLMProvider`: reads config, instantiates correct provider
-- Implement `validate_provider(provider: LLMProvider)`: runs health check, validates model is available, checks context window size meets minimum requirement (32k tokens)
+#### 1.5 Provider Factory (`internal/llm/factory.go`)
+- `func NewProvider(cfg config.OrchestratorConfig) (Provider, error)`: reads `Provider` field (`claude|ollama|lmstudio`), instantiates the correct implementation
+- `func ValidateProvider(ctx context.Context, p Provider) error`: calls `HealthCheck`, verifies `ContextWindow() >= 32000` (minimum for our use), logs model name and context window on success
 
-#### Tests (`tests/test_providers.py`)
-- Unit tests for each provider using `pytest-httpx` to mock HTTP calls
-- Test: correct message format sent to each provider
-- Test: tool call response correctly parsed for each provider
-- Test: streaming yields tokens correctly
-- Test: retry logic fires on 429 response
-- Integration test (marked `@pytest.mark.integration`): real call to each provider if credentials/server available
+#### 1.6 Token Budget Manager (`internal/llm/budget.go`)
+- Implement `BudgetManager`: tracks token usage per campaign; warns when a single conversation approaches 80% of context window
+- Implement `Summarize(ctx, messages []Message, provider Provider) ([]Message, error)`: when context exceeds 70% of window, sends the oldest 50% of messages to the LLM with instruction to summarize, replaces them with the summary — preserves recency while managing context
+- This is critical for long campaigns where the orchestrator accumulates a large message history
 
 **Acceptance Criteria:**
-- [ ] All three providers implement `LLMProvider` interface and pass type checking
-- [ ] Switching provider in config requires zero code changes in any agent
-- [ ] Claude provider correctly parses tool call responses
-- [ ] Ollama provider health check correctly detects when Ollama is not running
-- [ ] Token usage is tracked and logged for Claude provider
+- [ ] All three providers implement `Provider` interface and pass `go vet` + type checking
+- [ ] Switching `provider: ollama` to `provider: claude` in config requires zero code changes in any agent
+- [ ] Claude provider correctly parses a tool call response and returns populated `ToolCall` structs
+- [ ] Ollama `HealthCheck` returns a descriptive error when Ollama is not running, not a generic connection refused
+- [ ] Token usage is logged to DB after every Claude `Complete` call
+- [ ] `BudgetManager.Summarize` reduces a 20-message history to 11 messages (1 summary + 10 recent)
 
 **Dependencies:** Sprint 0
 
 ---
 
-### Sprint 2 — Recon Agent & Tool Integration
-**Duration:** 2 weeks
-**Goal:** Build the Recon Agent — tool execution wrappers for 8 recon tools + the Qwen-powered analysis layer that turns raw output into a structured attack surface model.
-
-**Why this sprint matters:** Everything downstream depends on the quality of the attack surface model. Bad recon = bad exploitation. This sprint defines the data model every other agent consumes.
-
-#### Attack Surface Data Model (`pipeline/context.py`)
-- Define `HostRecord`: IP, hostnames, open_ports, services (port → ServiceRecord), os_detection, last_seen
-- Define `ServiceRecord`: port, protocol, service_name, version, banner, http_details (if web service)
-- Define `HttpDetails`: url, status_code, title, server_header, technologies (list), response_headers, cookies, redirects
-- Define `SubdomainRecord`: domain, ip, cname, http_details, discovery_source
-- Define `EndpointRecord`: url, method, parameters, response_code, interesting (bool), notes
-- Define `AttackSurface`: target, subdomains (list), hosts (list), endpoints (list), technologies (dict), raw_findings (list), metadata
-- All models are Pydantic, serializable to JSON, stored in PostgreSQL as JSONB
-
-#### Tool Wrappers (`agents/recon/tools/`)
-Each tool wrapper implements `BaseTool`:
-```python
-class BaseTool(ABC):
-    name: str
-    @abstractmethod
-    async def run(self, target: str, options: dict) -> ToolResult: ...
-    @abstractmethod
-    def parse_output(self, raw_output: str) -> list[dict]: ...
-```
-
-- **`nmap.py`**: async subprocess wrapper for nmap; default flags `-sV -sC -O --open`; parse XML output (`-oX`) using `python-nmap`; extract: open ports, service names/versions, OS detection, script output; support fast mode (`-T4 -F`) and thorough mode (`-A`)
-
-- **`subfinder.py`**: async subprocess; parse JSON output (`-oJ`); extract: subdomain list with sources; integrate with DNS resolution to get IPs
-
-- **`httpx.py`**: async subprocess; parse JSONL output; extract: status code, title, server, content-type, content-length, technologies, redirect chain, TLS info
-
-- **`whatweb.py`**: async subprocess; parse JSON output (`--log-json`); extract: CMS, frameworks, JS libraries, server software, version numbers
-
-- **`gau.py`**: async subprocess; parse line-delimited URL output; deduplicate; filter by interesting extensions (`.php`, `.asp`, `.aspx`, `.jsp`, `.env`, `.git`, `.config`, `.bak`, `.sql`, `.log`)
-
-- **`ffuf.py`**: async subprocess; parse JSON output (`-o /tmp/ffuf.json -of json`); built-in wordlist selection based on detected technology (PHP wordlist for PHP apps, etc.); extract: discovered paths, response codes, sizes
-
-- **`nuclei.py`**: async subprocess; parse JSONL output; extract: template ID, severity, name, matched-at URL, extracted values; default: run `-t technologies` and `-t exposures` templates only (non-destructive)
-
-- **`amass.py`**: async subprocess for passive mode only (`enum -passive`); parse text output; extract: additional subdomains from passive sources
-
-#### Tool Execution Engine (`agents/recon/tools/executor.py`)
-- Implement `ToolExecutor`: manages parallel tool execution with `asyncio.gather`
-- Implement timeout enforcement per tool (nmap: 5min, subfinder: 2min, others: 90s)
-- Implement retry logic: if tool exits non-zero, retry once with simplified flags
-- Implement tool availability check at startup: `which <tool>` for each; warn if missing, suggest install command
-- Scope validation: `validate_command(command, scope)` called before every subprocess execution
-
-#### Recon Agent (`agents/recon/agent.py`)
-- Implement `ReconAgent`:
-  - `plan_recon(target, scope) -> ReconPlan`: determines which tools to run and in what order based on target type (domain → subfinder first; IP → nmap first; web app → httpx + ffuf)
-  - `execute_recon(plan: ReconPlan) -> RawReconData`: runs all tools, collects output
-  - `analyze(raw: RawReconData) -> AttackSurface`: sends all raw tool output to fine-tuned Qwen 2.5 7B model for analysis and normalization
-- Prompt design for Qwen model (pre-fine-tuning — will be improved with fine-tuned model):
-  - System: "You are a recon analysis expert. Given raw output from multiple security tools, extract a structured attack surface model. Correlate findings across tools. Identify the most interesting endpoints, exposed services, and technology stack."
-  - Input: structured raw tool outputs
-  - Output: JSON matching `AttackSurface` schema
-
-#### Output Parser (`agents/recon/parser.py`)
-- Implement `AttackSurfaceParser`: validates Qwen output against `AttackSurface` Pydantic model
-- Handle partial/malformed JSON output: retry with simplified prompt if parsing fails
-- Deduplication: merge duplicate hosts/subdomains found by multiple tools into single enriched records
-
-**Acceptance Criteria:**
-- [ ] nmap wrapper correctly parses XML output and returns structured `list[HostRecord]`
-- [ ] subfinder + httpx run in parallel against a test domain and results are merged
-- [ ] `AttackSurface` model correctly serializes to JSON and persists to DB
-- [ ] Recon agent completes full recon of a test domain in <5 minutes
-- [ ] Scope validator blocks tool execution against out-of-scope targets
-
-**Dependencies:** Sprint 1
-
----
-
-### Sprint 3 — Classifier Agent
+### Sprint 2 — Core Data Models & Database
 **Duration:** 1 week
-**Goal:** Build the Classifier Agent — takes the attack surface model and enriches every finding with CVE mappings, CVSS scores, false positive filtering, and severity ranking.
+**Goal:** Define every data structure the platform uses — campaigns, findings, attack surfaces, reports — and the database schema that persists them. Every subsequent sprint uses these models.
 
-**Why this sprint matters:** The Exploit Agent's quality is bounded by the quality of its input. Unclassified raw findings are noise. Classified, scored, ranked findings are a prioritized target list.
+**Why this sprint matters:** Data model decisions made now propagate to every agent, every API endpoint, every report template. Getting them right before building the agents prevents painful migrations later.
 
-#### CVE Mapping (`agents/classifier/cve_mapper.py`)
-- Implement `CVEMapper`:
-  - Query NVD API v2.0 for CVEs by: `keywordSearch` (technology name + version), CPE name matching
-  - Cache results in PostgreSQL: `cve_cache` table with TTL of 24 hours
-  - For each service version detected in recon: `get_cves(service_name, version) -> list[CVE]`
-  - Each `CVE`: id, description, cvss_v3_score, cvss_v3_vector, published_date, references
-- Integrate `vulners` Python library as secondary CVE source for broader coverage
+#### 2.1 Campaign Models (`internal/pipeline/context.go`)
+- Define `Campaign`: `ID uuid`, `Name string`, `Target string`, `Objective string`, `Status CampaignStatus`, `ScopeDefinition`, `AuthToken string`, `CreatedAt time.Time`, `StartedAt *time.Time`, `CompletedAt *time.Time`
+- Define `CampaignStatus` enum: `Planned | Initializing | Recon | Classifying | Planning | Executing | Adapting | Reporting | Complete | Failed | Aborted`
+- Define `CampaignEvent`: append-only audit log — `ID`, `CampaignID`, `Timestamp`, `EventType`, `AgentName`, `Detail string` (human-readable), `Data json.RawMessage` (structured)
+- Define `CampaignMode` enum: `Manual | BugBounty | ContinuousASM`
 
-#### CVSS Scorer (`agents/classifier/scorer.py`)
-- Implement `CVSSScorer`:
-  - Parse CVSS v3.1 vector strings into component scores
-  - Compute exploitability score, impact score, base score
-  - Adjust base score with contextual modifiers: internet-facing (×1.2), authenticated_required (×0.7), known_exploit_available (×1.3)
-  - Output: `SeverityRating` enum: `CRITICAL | HIGH | MEDIUM | LOW | INFORMATIONAL`
+#### 2.2 Attack Surface Models
+- Define `AttackSurface`: `CampaignID`, `Target`, `Subdomains []SubdomainRecord`, `Hosts []HostRecord`, `Endpoints []EndpointRecord`, `Technologies map[string]string`, `CreatedAt`
+- Define `HostRecord`: `IP string`, `Hostnames []string`, `OpenPorts []int`, `Services map[int]ServiceRecord`, `OS string`, `Tags []string`
+- Define `ServiceRecord`: `Port int`, `Protocol string`, `Name string`, `Version string`, `Banner string`, `HTTPDetails *HTTPDetails`
+- Define `HTTPDetails`: `URL string`, `StatusCode int`, `Title string`, `Server string`, `Technologies []string`, `Headers map[string]string`, `ResponseBodyHash string`
+- Define `SubdomainRecord`: `Domain string`, `IP string`, `CNAME string`, `HTTPDetails *HTTPDetails`, `Source string`
+- Define `EndpointRecord`: `URL string`, `Method string`, `Parameters []string`, `StatusCode int`, `Interesting bool`, `Notes string`
 
-#### False Positive Filter (`agents/classifier/fp_filter.py`)
-- Implement pattern-based false positive detection:
-  - Remove generic "Server: Apache" findings without version numbers
-  - Remove findings on non-responsive endpoints (4xx/5xx without meaningful content)
-  - Remove duplicate findings (same CVE on same port)
-  - Flag findings that require manual verification (e.g. "default credentials" — cannot be auto-verified without attempting login)
-- Implement confidence scoring: `HIGH | MEDIUM | LOW | UNVERIFIED` per finding
+#### 2.3 Finding Models
+- Define `RawFinding`: `ID uuid`, `CampaignID`, `Source string` (which tool), `Type string`, `Target string`, `Detail string`, `RawOutput string`, `DiscoveredAt time.Time`
+- Define `ClassifiedFinding`: `ID uuid`, `RawFindingID`, `Title string`, `Description string`, `CVEIDs []string`, `CVSSScore float64`, `CVSSVector string`, `Severity Severity`, `AttackCategory string`, `Confidence Confidence`, `FalsePositiveProbability float64`, `ChainCandidates []uuid`, `Evidence []Evidence`
+- Define `Severity` enum: `Critical | High | Medium | Low | Informational`
+- Define `Confidence` enum: `High | Medium | Low | Unverified`
+- Define `Evidence`: `Type string` (command_output/screenshot/log), `Content string`, `Timestamp time.Time`, `Description string`
 
-#### Classifier Agent (`agents/classifier/agent.py`)
-- Implement `ClassifierAgent`:
-  - `classify(surface: AttackSurface) -> ClassifiedFindingSet`
-  - For each finding in attack surface: run CVE mapping + CVSS scoring + FP filter
-  - Send to fine-tuned Mistral 7B model for contextual classification:
-    - Is this interesting given the overall target profile?
-    - Does this finding chain with other findings?
-    - What attack category does this fall into? (OWASP Top 10, auth bypass, info disclosure, RCE, etc.)
-  - Output: `ClassifiedFindingSet` — sorted by exploitability score, grouped by attack category
-- Define `ClassifiedFinding`: finding_id, original_finding, cve_ids, cvss_score, severity, attack_category, confidence, false_positive_probability, chain_candidates (other finding IDs this could chain with), notes
+#### 2.4 Attack Plan Models
+- Define `AttackPlan`: `ID uuid`, `CampaignID`, `Paths []AttackPath`, `RecommendedPathID uuid`, `Reasoning string`, `CreatedAt time.Time`
+- Define `AttackPath`: `ID uuid`, `Name string`, `Description string`, `Steps []AttackStep`, `TargetFindingIDs []uuid`, `EstimatedSuccessProbability float64`, `RequiredPrivileges string`, `ExpectedImpact string`
+- Define `AttackStep`: `ID uuid`, `Name string`, `TechniqueID string` (MITRE ATT&CK), `Command string`, `ExpectedOutputPattern string`, `OnSuccessStepID *uuid`, `OnFailureStepID *uuid`, `CleanupCommand string`
+- Define `ExecutionResult`: `StepID uuid`, `CommandExecuted string`, `Output string`, `Success bool`, `Evidence []Evidence`, `ExecutedAt time.Time`, `DurationMs int`
+
+#### 2.5 Database Schema & Migrations (`internal/db/migrations/`)
+- Write migration `000001_initial.sql`: creates all tables matching above models — `campaigns`, `campaign_events`, `attack_surfaces`, `raw_findings`, `classified_findings`, `attack_plans`, `attack_paths`, `attack_steps`, `execution_results`
+- Write migration `000002_pgvector.sql`: enables `pgvector` extension, adds `embedding vector(1536)` column to `classified_findings` for semantic similarity search
+- Write migration `000003_cleanup_registry.sql`: creates `cleanup_actions` table (`id`, `campaign_id`, `command`, `target`, `registered_at`, `executed_at`, `status`)
+- Verify all migrations run forward and backward cleanly
+
+#### 2.6 Database Queries (sqlc)
+- Write `internal/db/queries/campaigns.sql`: `CreateCampaign`, `GetCampaign`, `UpdateCampaignStatus`, `ListCampaigns`, `AppendCampaignEvent`, `GetCampaignEvents`
+- Write `internal/db/queries/findings.sql`: `InsertRawFinding`, `InsertClassifiedFinding`, `GetFindingsByCampaign`, `GetFindingByID`, `UpdateFindingClassification`
+- Write `internal/db/queries/plans.sql`: `InsertAttackPlan`, `GetAttackPlan`, `InsertExecutionResult`, `GetExecutionResults`
+- Run `sqlc generate` to produce type-safe Go query functions in `internal/db/queries/`
+- Write `internal/db/postgres.go`: `Connect(cfg DatabaseConfig) (*pgxpool.Pool, error)` — connection pool with max connections, health check on startup
+
+#### 2.7 Cleanup Registry (`internal/pipeline/cleanup.go`)
+- Implement `CleanupRegistry`:
+  - `Register(ctx, campaignID, command, target string) error` — inserts into `cleanup_actions` before any command runs
+  - `RunCleanup(ctx, campaignID string) CleanupReport` — executes all registered cleanup commands for a campaign in reverse order; marks each as `executed` or `failed`; returns report of what succeeded/failed
+  - `PendingCleanup(ctx, campaignID string) ([]CleanupAction, error)` — returns unexecuted cleanup actions (for recovery after crash)
+- `CleanupRegistry` is injected into every agent executor — they call `Register` before every command
 
 **Acceptance Criteria:**
-- [ ] CVE mapper returns correct CVEs for Apache 2.4.49 (known critical CVE)
-- [ ] CVSS scorer correctly computes base score from vector string
-- [ ] False positive filter removes generic server banner findings
-- [ ] Classifier produces sorted `ClassifiedFindingSet` with severity ratings
-- [ ] Classification completes in <60 seconds for a 50-finding attack surface
+- [ ] All migrations run cleanly on a fresh PostgreSQL instance
+- [ ] sqlc generates valid, compilable Go code for all queries
+- [ ] `CleanupRegistry.RunCleanup` executes registered actions in reverse order and marks each complete in DB
+- [ ] `AttackSurface` serializes to/from JSON correctly with nested structs
+- [ ] `pgvector` extension is available and `embedding` column accepts 1536-dimensional vectors
 
-**Dependencies:** Sprint 2
+**Dependencies:** Sprint 0
 
 ---
 
-### Sprint 4 — Exploit Agent & Execution Engine
+### Sprint 3 — Recon Agent & Native Go Tool Integration
 **Duration:** 2 weeks
-**Goal:** Build the Exploit Agent — the DeepSeek R1-powered system that constructs multi-step attack chains and the execution engine that runs them safely.
+**Goal:** Build the Recon Agent — native Go wrappers for 7 security tools, plus the Qwen-powered analysis layer that turns raw output into a structured `AttackSurface` model.
 
-**Why this sprint matters:** This is the most technically challenging agent. Attack path construction requires genuine multi-step reasoning — not pattern matching. DeepSeek R1's chain-of-thought architecture is specifically chosen for this.
+**Why this sprint matters:** The quality of everything downstream (classification, exploitation, reporting) is bounded by the quality of recon. This sprint defines the data that every other agent reasons about.
 
-#### Attack Path Model (`pipeline/context.py` additions)
-- Define `AttackPath`: path_id, name, description, steps (ordered list of `AttackStep`), target_finding_ids, estimated_success_probability, required_privileges, expected_impact
-- Define `AttackStep`: step_id, technique_name, mitre_technique_id, command, expected_output_pattern, on_success (next step ID), on_failure (fallback step ID or null), cleanup_command
-- Define `AttackPlan`: plan_id, campaign_id, paths (ranked list of `AttackPath`), recommended_path_id, reasoning
-- Define `ExecutionResult`: step_id, command_executed, output, success, evidence, timestamp
+#### 3.1 Tool Wrapper Interface (`internal/tools/base.go`)
+- Define `Tool` interface:
+  ```go
+  type Tool interface {
+      Name() string
+      Run(ctx context.Context, target string, opts Options) (*ToolResult, error)
+      IsAvailable() bool
+  }
+  ```
+- Define `ToolResult`: `ToolName string`, `Target string`, `RawOutput string`, `ParsedFindings []map[string]any`, `Duration time.Duration`, `Error error`
+- Define `Options`: `map[string]any` with typed accessors `GetString(key)`, `GetInt(key)`, `GetBool(key)`
+- **Every `Run` implementation calls `scope.ValidateCommand(constructedCommand, scope)` before executing. Returns `ErrScopeViolation` without running if check fails.**
 
-#### Exploit Agent (`agents/exploit/agent.py`)
-- Implement `ExploitAgent`:
-  - `build_attack_plan(findings: ClassifiedFindingSet, objective: str) -> AttackPlan`
-    - Sends classified findings + objective to DeepSeek R1 8B model
-    - Model reasons through: which findings are most exploitable, how to chain them, what the kill chain looks like from initial finding to objective
-    - Returns structured `AttackPlan` JSON
-  - `adapt_plan(plan: AttackPlan, step_result: ExecutionResult) -> AttackPlan`
-    - After each step execution, feeds result back to model
-    - Model reasons: did this succeed as expected? What does it change about the remaining plan? Should we pivot?
-    - Returns updated plan
+#### 3.2 subfinder (`internal/tools/subfinder.go`)
+- Import `github.com/projectdiscovery/subfinder/v2/pkg/runner` as a library (no subprocess)
+- Configure runner: passive sources only by default (no active DNS brute force unless `aggressive: true` in options), respect scope domain
+- Parse results: each subdomain → `SubdomainRecord` with source attribution
+- Options: `recursive bool`, `timeout int`, `rateLimit int`
 
-- Prompt design for DeepSeek R1 (pre-fine-tuning):
-  - Leverage R1's `<think>` chain-of-thought: explicitly ask for reasoning before answer
-  - "Think through each finding and how it could be exploited. Consider chaining: can finding A be used to gain access that makes finding B exploitable? Construct the most efficient path to the objective."
+#### 3.3 httpx (`internal/tools/httpx.go`)
+- Import `github.com/projectdiscovery/httpx/runner` as a library
+- Default probes: status code, title, content length, server header, technology detection, redirect chain, TLS info
+- Parse JSON output → `HTTPDetails` per URL
+- Options: `followRedirects bool`, `timeout int`, `threads int`, `matchStatusCodes []int`
 
-#### Attack Path Builder (`agents/exploit/path_builder.py`)
-- Implement `PathBuilder`: programmatic (non-LLM) attack path construction as a fallback and supplement to LLM reasoning
-  - `build_chains(findings: list[ClassifiedFinding]) -> list[AttackPath]`: graph-based chain construction
-  - Nodes: findings; Edges: "finding A enables finding B" relationships (e.g. directory traversal → read config file → extract credentials → authenticate to admin panel)
-  - Pre-defined relationship rules: `SQLI_enables_data_extraction`, `PATH_TRAVERSAL_enables_file_read`, `OPEN_REDIRECT_enables_phishing`, `EXPOSED_GIT_enables_source_code_review`, etc.
-  - LLM supplements this with novel chains the rules don't cover
+#### 3.4 nuclei (`internal/tools/nuclei.go`)
+- Import `github.com/projectdiscovery/nuclei/v3/pkg/...` as a library
+- Default template categories for recon phase: `technologies`, `exposures`, `misconfiguration` — non-destructive only
+- Parse JSON results → `RawFinding` per match with template ID, severity, matched-at
+- Options: `templates []string`, `severity []string`, `timeout int`, `rateLimit int`
 
-#### Command Execution Engine (`agents/exploit/executor.py`)
-- Implement `CommandExecutor`:
-  - `execute(command: str, timeout: int, scope: ScopeDefinition) -> ExecutionResult`
-  - **Pre-execution:** `validate_command(command, scope)` — parse command for embedded targets, verify all against scope
-  - Execute via `asyncio.create_subprocess_shell` with `timeout`
-  - Capture stdout, stderr, return code
-  - Pattern match output against `expected_output_pattern` in `AttackStep` to determine success
-  - Register cleanup command before executing (cleanup runs even if campaign aborts)
-- Implement `DryRunExecutor`: prints commands without executing — `--dry-run` mode for reviewing planned attacks before running
+#### 3.5 naabu (`internal/tools/naabu.go`)
+- Import `github.com/projectdiscovery/naabu/v2/pkg/runner` as a library
+- Default: scan top-1000 ports with SYN scan; stealth option slows rate and randomizes order
+- Parse results: open port list → populate `HostRecord.OpenPorts`
+- Options: `ports string` (e.g. `"80,443,8080"` or `"top-100"`), `timeout int`, `rate int`
 
-#### Cleanup Registry (`pipeline/campaign.py`)
-- Before every command execution: `register_cleanup(campaign_id, cleanup_command, target)`
-- `run_cleanup(campaign_id)`: executes all registered cleanup commands in reverse order
-- Persist to DB: survives controller restarts
+#### 3.6 katana (`internal/tools/katana.go`)
+- Import `github.com/projectdiscovery/katana/pkg/...` as a library
+- Web crawler: discovers endpoints, forms, JS-referenced URLs
+- Parse results: unique URLs → `EndpointRecord` list
+- Options: `depth int`, `javaScriptCrawl bool`, `timeout int`, `headless bool`
+
+#### 3.7 dnsx (`internal/tools/dnsx.go`)
+- Import `github.com/projectdiscovery/dnsx/libs/dnsx` as a library
+- Bulk DNS resolution for discovered subdomains → IP addresses
+- Reverse DNS lookups for discovered IPs
+- Options: `resolvers []string`, `retries int`, `timeout int`
+
+#### 3.8 gau (`internal/tools/gau.go`)
+- Import `github.com/lc/gau/v2/pkg/...` as a library
+- Fetches known URLs from Wayback Machine, Common Crawl, URLScan, OTX
+- Filter interesting extensions: `.php`, `.asp`, `.aspx`, `.jsp`, `.env`, `.git`, `.config`, `.bak`, `.sql`, `.log`, `.key`, `.pem`
+- Parse results → `EndpointRecord` list with source attribution
+
+#### 3.9 Tool Execution Coordinator (`internal/tools/coordinator.go`)
+- Implement `Coordinator`: manages parallel tool execution
+  - `RunAll(ctx, target, scope, opts) (*ToolRunSummary, error)`: runs all tools concurrently with `errgroup`; each tool gets its own timeout from config; failures are logged but don't abort other tools
+  - `RunSelected(ctx, tools []string, target, scope, opts)`: run subset of tools
+  - Tool ordering: subfinder + dnsx first (discover subdomains/IPs), then naabu + httpx in parallel, then katana + gau + nuclei in parallel
+  - Streams `ToolResult` events to a channel as each tool completes (don't wait for all to finish)
+
+#### 3.10 Recon Agent (`internal/agent/recon/agent.go`)
+- Implement `ReconAgent`:
+  - `PlanRecon(target, scope) ReconPlan`: determines which tools to run based on target type
+    - Domain target: subfinder → dnsx → naabu + httpx → katana + gau + nuclei
+    - IP target: naabu → httpx → nuclei
+    - URL target: httpx → katana → gau → nuclei
+  - `Execute(ctx, plan ReconPlan) (*AttackSurface, error)`:
+    1. Run `Coordinator.RunAll` for planned tools
+    2. Stream tool results to campaign event log as they arrive
+    3. Collect all `ToolResult` objects
+    4. Call `Analyze` with collected results
+  - `Analyze(ctx, results []ToolResult) (*AttackSurface, error)`:
+    1. Serialize all tool results into structured JSON context string
+    2. Send to Qwen 2.5 7B model via Ollama provider with analysis prompt
+    3. Parse response into `AttackSurface` struct
+    4. Validate: every field matches schema, no empty required fields
+    5. Persist `AttackSurface` to DB
+    6. Return to orchestrator
+
+#### 3.11 Output Parser (`internal/agent/recon/parser.go`)
+- Implement `ParseAttackSurface(rawJSON string) (*AttackSurface, error)`: strict JSON parsing with field validation
+- Implement `MergeToolResults(results []ToolResult) MergedData`: deduplicates hosts/subdomains found by multiple tools into single enriched records
+- Retry logic: if Qwen response doesn't parse as valid `AttackSurface`, retry with simplified prompt up to 2 times; on third failure return partial results rather than error
+
+#### 3.12 Tests
+- `tests/unit/tools/subfinder_test.go`: mock subfinder runner, verify output parsing
+- `tests/unit/tools/scope_enforcement_test.go`: verify every tool wrapper calls scope validation, returns `ErrScopeViolation` for out-of-scope targets
+- `tests/unit/recon/parser_test.go`: table-driven tests with valid and malformed Qwen outputs, verify parser handles all cases
+- `tests/integration/recon_test.go` (marked `integration`): run recon against `scanme.nmap.org` (a legitimate public test target), verify `AttackSurface` is populated
 
 **Acceptance Criteria:**
-- [ ] Exploit agent constructs a valid multi-step attack path from a test `ClassifiedFindingSet`
-- [ ] Command executor correctly captures output and matches against expected pattern
-- [ ] Scope validator blocks execution of commands targeting out-of-scope hosts
-- [ ] Dry run mode prints all commands without executing any
-- [ ] Cleanup registry correctly reverses test file creation during cleanup
+- [ ] All 7 tools run natively as Go library calls — no `exec.Command` for any tool
+- [ ] Scope validation blocks any tool from targeting an out-of-scope IP at the wrapper level
+- [ ] `Coordinator.RunAll` streams results as each tool completes, not after all finish
+- [ ] Recon agent successfully analyzes output and returns a valid `AttackSurface` with at least hosts, ports, and technologies populated
+- [ ] Full recon of a simple target completes in under 5 minutes
+
+**Dependencies:** Sprints 0, 1, 2
+
+---
+
+### Sprint 4 — Classifier Agent
+**Duration:** 1 week
+**Goal:** Build the Classifier Agent — takes raw findings from the attack surface and enriches each one with CVE mappings, CVSS scores, false positive filtering, and severity ranking.
+
+**Why this sprint matters:** Raw findings are noise. The Exploit Agent's reasoning quality is directly bounded by the quality of classified, scored, ranked findings it receives. Garbage in, garbage out.
+
+#### 4.1 NVD CVE Client (`internal/agent/classifier/cve.go`)
+- Implement `NVDClient`:
+  - `SearchByCPE(ctx, cpeName string) ([]CVE, error)`: query NVD API v2.0 `GET /rest/json/cves/2.0?cpeName=...`
+  - `SearchByKeyword(ctx, product, version string) ([]CVE, error)`: query with `keywordSearch={product version}`
+  - `GetCVE(ctx, cveID string) (*CVE, error)`: fetch specific CVE by ID
+  - Rate limiting: NVD API allows 5 req/30s without API key, 50 req/30s with key — implement token bucket rate limiter
+  - Caching: store results in Redis with 24-hour TTL; key = `nvd:{cpe_or_keyword}`; avoid redundant API calls
+- Define `CVE`: `ID`, `Description`, `CVSSv3Score float64`, `CVSSv3Vector string`, `CVSSv3Severity string`, `PublishedDate time.Time`, `References []string`, `AffectedVersions []string`
+
+#### 4.2 CVSS Scorer (`internal/agent/classifier/scorer.go`)
+- Implement `ParseCVSSVector(vector string) (*CVSSComponents, error)`: parse CVSS v3.1 vector string (e.g. `AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H`) into component struct
+- Implement `ComputeBaseScore(components CVSSComponents) float64`: implement CVSS v3.1 base score formula exactly per FIRST specification
+- Implement `AdjustForContext(base float64, ctx ScoringContext) float64`:
+  - `ctx.InternetFacing = true`: multiply by 1.15 (higher exposure)
+  - `ctx.AuthenticationRequired = true`: multiply by 0.8 (harder to exploit)
+  - `ctx.ExploitAvailable = true`: multiply by 1.2 (weaponized exploit exists)
+  - Cap at 10.0
+- Implement `ScoreToSeverity(score float64) Severity`: 9.0-10.0 = Critical, 7.0-8.9 = High, 4.0-6.9 = Medium, 0.1-3.9 = Low, 0.0 = Informational
+
+#### 4.3 False Positive Filter (`internal/agent/classifier/fp_filter.go`)
+- Implement `FPFilter.Score(finding RawFinding) float64`: returns false positive probability 0.0-1.0
+- Rules (each adds to FP probability):
+  - Generic server banner without version number: +0.6
+  - Port open finding without service identification: +0.4
+  - Endpoint found but returns 4xx on all probes: +0.5
+  - CVE mapped but version range doesn't match detected version: +0.7
+  - Finding appears in >80% of scans (common baseline noise): +0.5
+  - Finding on non-standard port with no service match: +0.3
+- Implement `ShouldFilter(finding RawFinding) bool`: returns true if FP probability > 0.75
+
+#### 4.4 Classifier Agent (`internal/agent/classifier/agent.go`)
+- Implement `ClassifierAgent`:
+  - `Classify(ctx, surface AttackSurface) (*ClassifiedFindingSet, error)`:
+    1. For each `RawFinding` in surface:
+       a. Run CVE lookup (parallel, rate-limited)
+       b. Compute CVSS score
+       c. Compute FP probability
+       d. Skip findings with FP probability > 0.75
+    2. Batch remaining findings into groups of 20
+    3. For each batch: send to Mistral 7B via Ollama with classification prompt asking for: attack category, confidence level, chain candidates, contextual notes
+    4. Parse Mistral output → `ClassifiedFinding` structs
+    5. Sort results by CVSS score descending
+    6. Persist `ClassifiedFindingSet` to DB
+    7. Return to orchestrator
+- Define `ClassifiedFindingSet`: `CampaignID`, `Findings []ClassifiedFinding`, `Summary ClassificationSummary`, `CreatedAt`
+- Define `ClassificationSummary`: `TotalFindings int`, `BySeverity map[Severity]int`, `TopCategories []string`, `FilteredAsFP int`
+
+#### 4.5 Tests
+- `tests/unit/classifier/cve_test.go`: mock NVD HTTP responses, verify caching, rate limiting
+- `tests/unit/classifier/scorer_test.go`: verify CVSS score computation against known test vectors from FIRST specification
+- `tests/unit/classifier/fp_filter_test.go`: table-driven tests for each FP rule
+- `tests/integration/classifier_test.go`: classify a set of 10 known real findings, verify severity assignments
+
+**Acceptance Criteria:**
+- [ ] CVSS score computation matches FIRST reference calculator for 5 known test vectors
+- [ ] NVD cache hit rate is 100% on second call for same CVE
+- [ ] FP filter correctly identifies and removes 3 known false positive patterns
+- [ ] Classifier processes 50 findings in under 60 seconds
+- [ ] `ClassifiedFindingSet` is sorted by CVSS score descending
 
 **Dependencies:** Sprints 2, 3
 
 ---
 
-### Sprint 5 — Orchestrator Agent
+### Sprint 5 — Exploit Agent & Execution Engine
 **Duration:** 2 weeks
-**Goal:** Build the Orchestrator Agent — the ReAct loop that plans campaigns, coordinates the four specialist agents, and makes high-level decisions.
+**Goal:** Build the Exploit Agent — DeepSeek R1-powered attack chain construction — and the execution engine that safely runs exploitation commands.
 
-**Why this sprint matters:** This is the glue. The orchestrator turns four independent agents into a coherent, adaptive campaign. It's the only agent that sees the full picture.
+**Why this sprint matters:** This is the most technically challenging agent. Attack path construction requires genuine multi-step reasoning. DeepSeek R1's chain-of-thought architecture is chosen precisely for this. The execution engine must be both capable and safe.
 
-#### ReAct Agent Loop (`orchestrator/agent.py`)
-- Implement `OrchestratorAgent` as a ReAct (Reason + Act) loop:
+#### 5.1 Attack Path Builder (`internal/agent/exploit/pathbuilder.go`)
+- Implement `PathBuilder.BuildChains(findings []ClassifiedFinding) []AttackPath`:
+  - Graph-based chain construction: findings are nodes, "A enables B" relationships are edges
+  - Pre-defined relationship rules:
+    - `SQLInjection` → `DataExtraction`, `AuthBypass`, `FileRead`
+    - `PathTraversal` → `FileRead`, `SourceCodeDisclosure`, `CredentialAccess`
+    - `OpenRedirect` → `PhishingAmplification`, `OAuthBypass`
+    - `ExposedGitRepo` → `SourceCodeDisclosure`, `CredentialExtraction`, `SecretDiscovery`
+    - `WeakCredentials` → `AuthenticationBypass`, `PrivilegeEscalation`
+    - `OutdatedSoftware` → `KnownExploitAvailable`
+    - `MisconfiguredCORS` → `CrossOriginDataTheft`
+    - `XXE` → `SSRF`, `FileRead`, `InternalNetworkScan`
+    - `SSRF` → `InternalNetworkScan`, `CloudMetadataAccess`, `PortScan`
+  - Build all valid chains, return as `[]AttackPath` sorted by estimated success probability
+  - This supplements (not replaces) DeepSeek's reasoning — the LLM adds novel chains the rules don't cover
+
+#### 5.2 Exploit Agent (`internal/agent/exploit/agent.go`)
+- Implement `ExploitAgent`:
+  - `BuildPlan(ctx, findings ClassifiedFindingSet, objective string) (*AttackPlan, error)`:
+    1. Call `PathBuilder.BuildChains` to get rule-based chains
+    2. Serialize findings + objective + rule-based chains into context
+    3. Send to DeepSeek R1 8B via Ollama with prompt instructing chain-of-thought reasoning:
+       - "Think through each finding. Which are most exploitable? How can they be chained? What path leads most efficiently to the objective? Output your thinking in `<think>` tags, then output the final plan as JSON."
+    4. Parse `<think>` section as reasoning trace (stored in `AttackPlan.Reasoning`)
+    5. Parse JSON plan section as `AttackPlan` struct
+    6. Merge LLM-generated paths with rule-based paths, deduplicate
+    7. Rank all paths by: success probability × severity × chain length score
+    8. Persist `AttackPlan` to DB
+    9. Return to orchestrator
+  - `AdaptPlan(ctx, plan AttackPlan, result ExecutionResult) (*AttackPlan, error)`:
+    1. Serialize current plan + latest execution result into context
+    2. Send to DeepSeek R1: "Given this step result, should we continue on the current path, pivot to an alternative, or adjust the approach? Think through it then output the updated plan."
+    3. Parse and return updated `AttackPlan`
+
+#### 5.3 Command Execution Engine (`internal/agent/exploit/executor.go`)
+- Implement `Executor`:
+  - `Execute(ctx, step AttackStep, scope ScopeDefinition) (*ExecutionResult, error)`:
+    1. `scope.ValidateCommand(step.Command, scope)` — hard stop if fails
+    2. `cleanup.Register(campaignID, step.CleanupCommand, target)` — must complete before execution
+    3. `exec.CommandContext(ctx, ...)` with timeout from step or default (120s)
+    4. Capture stdout + stderr
+    5. Match output against `step.ExpectedOutputPattern` (regex)
+    6. Build and return `ExecutionResult`
+  - `DryRun(step AttackStep) string`: returns the command string with all substitutions applied, without executing — used by `--dry-run` flag
+
+#### 5.4 Docker Executor (`internal/agent/exploit/docker_executor.go`)
+- For commands that require a specific environment (Kali Linux tools not available locally):
+  - Implement `DockerExecutor`: uses `docker/docker client-go` to create ephemeral containers
+  - `RunInContainer(ctx, image, command string) (*ExecutionResult, error)`:
+    1. Pull image if not present
+    2. Create container with: no network access to host, read-only filesystem except `/tmp`, memory limit 512MB, CPU limit 0.5 core
+    3. Run command, stream output
+    4. Remove container after completion (always, even on error)
+  - Default image: `kalilinux/kali-rolling` with pre-installed tools
+  - Scope validation still applies — container networking is restricted to target scope
+
+#### 5.5 Tests
+- `tests/unit/exploit/pathbuilder_test.go`: verify rule-based chains are correctly constructed for known finding combinations
+- `tests/unit/exploit/executor_test.go`: mock command execution, verify scope validation is called, verify cleanup is registered, verify dry run returns command without executing
+- `tests/unit/exploit/docker_test.go`: mock Docker API, verify container lifecycle (create → run → remove)
+
+**Acceptance Criteria:**
+- [ ] Exploit agent constructs a valid `AttackPlan` with at least 2 attack paths from a test `ClassifiedFindingSet`
+- [ ] `<think>` reasoning trace is captured and stored in `AttackPlan.Reasoning`
+- [ ] Executor calls `scope.ValidateCommand` before running any command
+- [ ] Executor calls `cleanup.Register` before running any command
+- [ ] `DryRun` returns command string without executing (verified by checking no child processes spawned)
+- [ ] Docker executor removes container after execution even when command fails
+
+**Dependencies:** Sprints 2, 3, 4
+
+---
+
+### Sprint 6 — Orchestrator Agent
+**Duration:** 2 weeks
+**Goal:** Build the Orchestrator Agent — the ReAct loop that coordinates all four specialist agents, plans campaigns, makes adaptive decisions, and manages campaign state.
+
+**Why this sprint matters:** This is the glue that turns four independent agents into a coherent, adaptive campaign. The orchestrator is the only component that sees the full picture — every decision flows through it.
+
+#### 6.1 ReAct Agent Loop (`internal/agent/orchestrator/agent.go`)
+- Implement `OrchestratorAgent` as a ReAct (Reason + Act + Observe) loop:
   ```
   loop:
-    1. THINK: Given campaign state + memory + last result → what to do next
-    2. ACT: Call a tool (run_recon, classify_findings, build_attack_plan,
-                         execute_step, generate_report, pause, complete)
-    3. OBSERVE: Receive structured result from tool/agent call
-    4. REMEMBER: Append to campaign memory
-    5. goto 1
+    1. Build message: system prompt + campaign context + memory + last observation
+    2. Send to LLM provider (Claude or local)
+    3. Receive: either a text response (reasoning) or a tool call
+    4. If tool call: dispatch to appropriate specialist agent or built-in tool
+    5. Append tool result to messages as tool response
+    6. Append to campaign memory
+    7. Emit event to WebSocket hub (for live streaming to UI/CLI)
+    8. Check: is campaign objective reached? Is campaign aborted?
+    9. Loop
   ```
-- Implement tool calling: each specialist agent operation is a tool the orchestrator can invoke
-- Implement campaign memory: rolling structured log of all decisions, actions, results — passed as context on each loop iteration
-- Implement token budget management: summarize old memory when approaching context window limit
+- Implement campaign memory as a rolling `[]Message` slice: append each exchange; when token budget reaches 70%, call `BudgetManager.Summarize`
+- Implement loop termination conditions: objective reached, all attack paths exhausted, maximum iterations exceeded (configurable, default 50), campaign aborted
 
-#### Orchestrator Tools (`orchestrator/tools/`)
-- `run_recon(target, scope, depth)` → dispatches `ReconAgent`, returns `AttackSurface`
-- `classify_findings(attack_surface)` → dispatches `ClassifierAgent`, returns `ClassifiedFindingSet`
-- `build_attack_plan(findings, objective)` → dispatches `ExploitAgent`, returns `AttackPlan`
-- `execute_attack_step(step_id, plan_id)` → dispatches `CommandExecutor`, returns `ExecutionResult`
-- `adapt_plan(plan_id, last_result)` → dispatches `ExploitAgent.adapt_plan`, returns updated `AttackPlan`
-- `generate_report(campaign_id)` → dispatches `ReportAgent`, returns report path
-- `pause_campaign(reason)` → pauses execution, notifies user, waits for resume
-- `complete_campaign(summary)` → marks campaign complete, triggers report generation
+#### 6.2 Orchestrator Tools (`internal/agent/orchestrator/tools.go`)
+- Define each specialist agent operation as a `Tool` the orchestrator can call:
+  - `run_recon`: args `{target, depth}` → dispatches `ReconAgent.Execute`, returns `AttackSurface` summary
+  - `classify_findings`: args `{campaign_id}` → dispatches `ClassifierAgent.Classify`, returns `ClassifiedFindingSet` summary
+  - `build_attack_plan`: args `{objective}` → dispatches `ExploitAgent.BuildPlan`, returns `AttackPlan` summary
+  - `execute_step`: args `{step_id, plan_id}` → dispatches `Executor.Execute`, returns `ExecutionResult`
+  - `adapt_plan`: args `{plan_id}` → dispatches `ExploitAgent.AdaptPlan` with last result, returns updated plan summary
+  - `generate_report`: args `{}` → dispatches `ReportAgent.Generate`, returns report path
+  - `query_surface`: args `{query}` → semantic search over `classified_findings` using pgvector similarity; returns matching findings
+  - `pause`: args `{reason}` → transitions campaign to `Paused`, sends notification, waits for resume signal
+  - `complete`: args `{summary}` → marks campaign complete, triggers report generation
 
-#### Campaign Planner (`orchestrator/planner.py`)
-- Implement `CampaignPlanner`:
-  - `decompose_objective(objective: str, target: str) -> list[Milestone]`
-  - Milestones: `[recon_complete, surface_classified, attack_plan_ready, objective_reached, report_generated]`
-  - Each milestone has success criteria and triggers next phase
-- Implement strategic decision making: after each exploit step result, orchestrator decides:
-  - Continue on current path?
-  - Pivot to a different attack path?
-  - Escalate privileges before continuing?
-  - Declare objective reached?
-  - Admit objective is unreachable and document why?
+#### 6.3 Campaign Planner (`internal/agent/orchestrator/planner.go`)
+- Implement `Planner.DecomposeObjective(objective, target string) []Milestone`:
+  - Milestones are ordered checkpoints the orchestrator tracks progress against
+  - `"find all vulnerabilities"` → `[recon_complete, findings_classified, exploitation_attempted, report_generated]`
+  - `"find RCE"` → `[recon_complete, rce_candidates_identified, rce_exploited_or_exhausted, report_generated]`
+  - `"bug bounty scan"` → `[scope_loaded, recon_complete, findings_classified, duplicates_checked, report_formatted]`
+- Implement `Planner.AssessMilestone(milestone Milestone, state CampaignState) bool`: checks whether current state satisfies milestone completion criteria
 
-#### Campaign State Machine (`pipeline/campaign.py`)
-- States: `CREATED → SCOPING → RECON → CLASSIFYING → PLANNING → EXECUTING → ADAPTING → REPORTING → COMPLETE | FAILED | ABORTED`
-- Each transition logged to `CampaignEvent` append-only table
-- Implement `EmergencyStop`: immediately transitions to `ABORTED`, triggers cleanup
+#### 6.4 Campaign State Machine (`internal/pipeline/campaign.go`)
+- Implement `StateMachine` with explicit state transitions:
+  - Each transition: validates it's allowed from current state, logs to `CampaignEvent`, updates DB
+  - Transitions: `Start()`, `BeginRecon()`, `BeginClassifying()`, `BeginPlanning()`, `BeginExecuting()`, `BeginAdapting()`, `BeginReporting()`, `Complete()`, `Fail(reason)`, `Abort()`
+  - `Abort()`: transitions to `Aborted`, triggers `CleanupRegistry.RunCleanup`, emits abort event to all subscribers
+- Implement `EmergencyStop(campaignID string)`: callable from API and CLI; calls `Abort()` within 5 seconds
 
-#### Campaign API (`api/routers/campaigns.py`)
-- `POST /api/v1/campaigns` — create campaign with target, objective, scope, authorization token
-- `POST /api/v1/campaigns/{id}/start` — begin execution
-- `POST /api/v1/campaigns/{id}/stop` — emergency stop
-- `GET /api/v1/campaigns/{id}` — status, current state, progress
-- `GET /api/v1/campaigns/{id}/stream` — SSE stream of real-time events (thoughts, actions, results)
-- `GET /api/v1/campaigns/{id}/report` — download generated report
+#### 6.5 Event Streaming (`internal/api/ws/hub.go`)
+- Implement `EventHub`: manages WebSocket connections per campaign
+  - `Subscribe(campaignID, conn)`: register a WebSocket connection
+  - `Publish(campaignID, event CampaignEvent)`: broadcast event to all subscribers for that campaign
+  - `Unsubscribe(campaignID, conn)`: clean up on disconnect
+- Events streamed in real-time: orchestrator reasoning text (token by token), tool dispatch, tool result, state transitions, new findings
+- Campaign event types: `thought` (orchestrator thinking), `tool_call`, `tool_result`, `finding_discovered`, `state_change`, `step_executed`, `error`
+
+#### 6.6 Campaign API (`internal/api/handlers/campaigns.go`)
+- `POST /api/v1/campaigns`: validate request body → create `Campaign` in DB → return campaign ID
+- `POST /api/v1/campaigns/:id/start`: verify authorization token → transition to `Initializing` → start orchestrator goroutine → return 202
+- `POST /api/v1/campaigns/:id/stop`: call `EmergencyStop` → return 200
+- `GET /api/v1/campaigns/:id`: return campaign with current status, milestone progress, finding counts
+- `GET /api/v1/campaigns/:id/events`: WebSocket upgrade → subscribe to `EventHub` → stream events
+- `GET /api/v1/campaigns/:id/findings`: return `ClassifiedFindingSet` (requires campaign in `Executing` or later state)
+- `GET /api/v1/campaigns/:id/report`: return generated report file (requires `Complete` state)
+
+#### 6.7 Tests
+- `tests/unit/orchestrator/agent_test.go`: mock all four specialist agents and LLM provider; verify ReAct loop correctly dispatches tool calls, appends to memory, terminates on objective-reached signal
+- `tests/unit/orchestrator/planner_test.go`: verify milestone decomposition for 3 different objective strings
+- `tests/unit/pipeline/state_machine_test.go`: verify all valid/invalid transitions; verify `Abort` calls cleanup
+- `tests/integration/orchestrator_test.go`: full orchestrator run against mock specialist agents; verify campaign progresses through all states
 
 **Acceptance Criteria:**
-- [ ] Orchestrator successfully runs a full campaign (recon → classify → plan → execute → report) against a test target (HackTheBox/TryHackMe style lab)
-- [ ] ReAct loop correctly calls tools in response to observation results
-- [ ] Emergency stop triggers cleanup and transitions to ABORTED within 5 seconds
-- [ ] SSE stream delivers real-time orchestrator thoughts and actions to client
-- [ ] Full campaign completes end-to-end in under 30 minutes on a simple target
+- [ ] Orchestrator ReAct loop correctly dispatches `run_recon` tool call and processes the returned `AttackSurface`
+- [ ] Campaign progresses through all states from `Planned` to `Complete` in integration test
+- [ ] Emergency stop transitions to `Aborted` and triggers cleanup within 5 seconds
+- [ ] WebSocket stream delivers orchestrator `thought` events in real-time (latency <500ms per token)
+- [ ] Token budget manager correctly summarizes memory when approaching 70% of context window
 
-**Dependencies:** Sprints 1–4
+**Dependencies:** Sprints 1, 2, 3, 4, 5
 
 ---
 
-### Sprint 6 — Report Agent
+### Sprint 7 — Report Agent
 **Duration:** 1 week
-**Goal:** Build the Report Agent — Llama 3.1 8B powered professional report generation from campaign findings.
+**Goal:** Build the Report Agent — Llama 3.1 8B-powered professional report generation in PDF, HTML, Markdown, and JSON formats.
 
-**Why this sprint matters:** The report is the deliverable. A brilliant pentest with a mediocre report is wasted work. Professional, structured output is what makes this usable for real engagements.
+**Why this sprint matters:** The report is the deliverable that justifies the entire platform. Professional, evidence-backed, clearly written output is what makes this usable for real engagements and bug bounty submissions.
 
-#### Report Data Model
-- Define `PentestReport`: campaign_id, target, objective, executive_summary, scope_description, methodology, findings (list), attack_narrative, risk_summary, remediation_plan, appendices
-- Define `Finding`: id, title, severity, cvss_score, description, evidence (list of `Evidence`), affected_components, remediation, references
-- Define `Evidence`: type (screenshot/command_output/log_excerpt), content, timestamp, description
+#### 7.1 Report Data Model (additions to Sprint 2 models)
+- Define `PentestReport`: `ID uuid`, `CampaignID`, `Target`, `Objective`, `ExecutiveSummary string`, `ScopeDescription string`, `Methodology string`, `Findings []ReportFinding`, `AttackNarrative string`, `RiskSummary RiskSummary`, `RemediationPlan []RemediationItem`, `Appendices []Appendix`, `GeneratedAt time.Time`
+- Define `ReportFinding`: `ID uuid`, `Title string`, `Severity Severity`, `CVSSScore float64`, `CVSSVector string`, `Description string`, `Evidence []Evidence`, `AffectedComponents []string`, `Remediation string`, `References []string`, `ProofOfConcept string`
+- Define `RiskSummary`: `OverallRisk string`, `CriticalCount int`, `HighCount int`, `MediumCount int`, `LowCount int`, `InfoCount int`
+- Define `RemediationItem`: `Priority int`, `Finding string`, `Action string`, `Effort string`, `Impact string`
 
-#### Report Agent (`agents/report/agent.py`)
-- Implement `ReportAgent`:
-  - `generate(campaign_id: str) -> PentestReport`
-  - Fetches all campaign data: `CampaignEvent` log, `ExecutionResult` records, `ClassifiedFindingSet`, `AttackPlan`
-  - Sends structured campaign data to fine-tuned Llama 3.1 8B in sections:
-    - Generate executive summary (non-technical, business risk focused)
-    - Generate finding writeup per confirmed vulnerability (technical, evidence-backed)
-    - Generate attack narrative (tells the story of the pentest as a sequence of events)
-    - Generate remediation plan (prioritized, specific, actionable)
-  - Assembles sections into complete `PentestReport`
+#### 7.2 Report Agent (`internal/agent/report/agent.go`)
+- Implement `ReportAgent.Generate(ctx, campaignID string) (*PentestReport, error)`:
+  1. Fetch from DB: campaign details, all `ClassifiedFinding` records, all `ExecutionResult` records, `AttackPlan`
+  2. Build structured context JSON from all campaign data
+  3. Call Llama 3.1 8B via Ollama in 4 separate prompts (to stay within context):
+     - Prompt 1: "Write an executive summary for a non-technical audience. Focus on business risk, not technical details. 2-3 paragraphs."
+     - Prompt 2: "For each finding, write a technical writeup with: what it is, why it matters, how it was found, evidence, how to fix it."
+     - Prompt 3: "Write an attack narrative — tell the story of this penetration test as a sequence of events, from initial recon to final finding."
+     - Prompt 4: "Write a prioritized remediation plan. Order items by: severity × ease of fix. Be specific and actionable."
+  4. Assemble all sections into `PentestReport`
+  5. Persist to DB
+  6. Return
 
-#### Report Renderer (`agents/report/renderer.py`)
-- **Markdown:** clean, structured, GitHub-renderable
-- **HTML:** self-contained HTML with embedded CSS, syntax highlighted code blocks, collapsible sections
-- **PDF:** uses `weasyprint` to render HTML → PDF; professional layout with cover page, table of contents, page numbers
-- **JSON:** machine-readable full report for integration with ticketing systems
+#### 7.3 Report Renderer (`internal/agent/report/renderer.go`)
+- Implement `Renderer.ToMarkdown(report *PentestReport) ([]byte, error)`: renders report to clean GitHub-flavored Markdown using `text/template`
+- Implement `Renderer.ToHTML(report *PentestReport) ([]byte, error)`: renders to self-contained HTML with embedded CSS (Tailwind via CDN), syntax-highlighted code blocks, collapsible finding sections
+- Implement `Renderer.ToPDF(report *PentestReport) ([]byte, error)`: renders HTML → PDF using `go-wkhtmltopdf` or `chromedp` headless Chrome; cover page with target and date, table of contents, page numbers, footer with classification marking
+- Implement `Renderer.ToJSON(report *PentestReport) ([]byte, error)`: `json.MarshalIndent` with clean field names
 
-#### Report Templates (`agents/report/templates/`)
-- `executive_summary.md.j2`: Jinja2 template for executive summary section
-- `finding.md.j2`: template for individual finding writeup
-- `remediation.md.j2`: template for remediation recommendations
-- Templates filled by Llama 3.1 output — model generates the content, template provides structure
+#### 7.4 Report Templates (`internal/agent/report/templates/`)
+- `executive_summary.html.tmpl`: section template with correct heading hierarchy
+- `finding.html.tmpl`: finding card with severity badge, CVSS gauge, evidence code block
+- `remediation.html.tmpl`: prioritized table with effort/impact matrix
+- `cover.html.tmpl`: cover page with target, date, classification marking, Armur AI branding
+
+#### 7.5 Tests
+- `tests/unit/report/renderer_test.go`: render a test `PentestReport` to all 4 formats, verify output is valid (Markdown parses, HTML is valid, JSON unmarshals, PDF is non-zero bytes)
+- `tests/unit/report/agent_test.go`: mock Llama provider, verify all 4 prompts are sent and responses assembled correctly
 
 **Acceptance Criteria:**
-- [ ] Report agent generates a complete report from a test campaign dataset in <3 minutes
-- [ ] PDF output is clean, professional, correctly paginated
-- [ ] Each finding section contains: title, severity, CVSS score, description, evidence, remediation
-- [ ] Executive summary is non-technical and business-risk focused
-- [ ] JSON export is valid and contains all findings with structured data
+- [ ] PDF report generates in under 60 seconds with cover page, TOC, and all sections
+- [ ] Each finding in report contains: title, severity badge, CVSS score, description, evidence block, remediation
+- [ ] Executive summary contains no technical jargon (verified by checking absence of CVE IDs and command strings)
+- [ ] JSON export is valid and deserializes to `PentestReport` struct without errors
+- [ ] HTML report is self-contained (no external CDN dependencies that would break offline viewing)
 
-**Dependencies:** Sprints 3, 4, 5
+**Dependencies:** Sprints 2, 5, 6
 
 ---
 
-### Sprint 7 — CLI & Web UI
+### Sprint 8 — CLI (Command Line Interface)
+**Duration:** 1 week
+**Goal:** A best-in-class CLI that is simple for beginners and powerful for experts. Beautiful terminal output. Zero configuration required for basic use.
+
+**Why this sprint matters:** The CLI is the primary interface for security professionals. It must feel as polished as tools like `gh`, `fly`, or `docker`. A good CLI drives adoption; a bad one kills it regardless of how good the backend is.
+
+#### 8.1 CLI Structure (`cli/`)
+- Implement root command with Cobra: `autopentest [command] [flags]`
+- Global flags: `--config string` (config file path), `--api string` (API server URL, default `http://localhost:8080`), `--json` (machine-readable JSON output), `--quiet` (suppress decorative output), `--verbose` (debug logging)
+- All commands that modify state require explicit confirmation unless `--yes` flag provided
+
+#### 8.2 Scan Command (`cli/scan.go`)
+```
+autopentest scan <target> [flags]
+
+Flags:
+  --objective string     What to find (default: "find all vulnerabilities")
+  --scope string         CIDR or domain scope, comma-separated (required)
+  --mode string          manual|bugbounty|asm (default: manual)
+  --provider string      claude|ollama|lmstudio (overrides config)
+  --dry-run              Show planned commands without executing
+  --output string        Output directory for report (default: ./reports)
+  --format string        Report format: pdf|html|md|json|all (default: pdf)
+  --follow               Stream live output (equivalent to scan + watch)
+  --auth-token string    Authorization token (required for production use)
+```
+- When `--follow` is set: starts campaign AND opens live watch view in same terminal session
+- `scan` creates the campaign, starts it, and returns campaign ID immediately (non-blocking) unless `--follow`
+
+#### 8.3 Campaign Commands (`cli/campaign.go`)
+```
+autopentest campaign list                   # List all campaigns with status
+autopentest campaign status <id>            # Detailed status of one campaign
+autopentest campaign watch <id>             # Live stream of agent activity
+autopentest campaign stop <id>              # Emergency stop
+autopentest campaign report <id> [flags]    # Download/display report
+autopentest campaign delete <id>            # Delete campaign and artifacts
+
+campaign report flags:
+  --format string   pdf|html|md|json (default: pdf)
+  --output string   Output path (default: ./<campaign-id>.pdf)
+  --open            Open report in browser/app after download
+```
+
+#### 8.4 Live Watch TUI (`cli/ui/watch.go`)
+- Implement using `bubbletea` — a full terminal UI with live updates:
+  - **Header bar**: campaign ID, target, objective, elapsed time, current state
+  - **Phase progress**: horizontal steps bar — `Recon → Classify → Plan → Execute → Report` with current step highlighted
+  - **Agent thoughts panel** (largest area): scrollable log of orchestrator reasoning text, streamed token by token, newest at bottom; dim gray for reasoning, bright white for decisions, yellow for tool calls
+  - **Findings ticker** (right sidebar): live count of findings by severity, updates as findings are discovered
+  - **Current action**: last tool dispatched + status (running / complete / failed)
+  - **Footer**: keyboard shortcuts — `q` quit watch (keeps campaign running), `s` stop campaign, `r` open report when complete, `↑↓` scroll thoughts
+- Connect to WebSocket `GET /api/v1/campaigns/:id/events`; render each event type appropriately
+
+#### 8.5 Doctor Command (`cli/doctor.go`)
+```
+autopentest doctor
+```
+- Checks in order, prints status with colored pass/fail indicator for each:
+  1. API server reachable at configured URL
+  2. PostgreSQL connected and migrations up to date
+  3. Redis connected
+  4. Ollama running at configured endpoint
+  5. Each of the 4 specialist models pulled in Ollama (check by name)
+  6. Each native Go tool available: subfinder, httpx, nuclei, naabu, katana, dnsx, gau (checks if Go module is available, not PATH)
+  7. Docker daemon running (required for container-mode execution)
+  8. Claude API key valid (if provider = claude, makes a minimal test call)
+  9. Available disk space > 10GB (for model storage and reports)
+  10. RAM > 8GB (for running local models)
+- On any failure: print specific instructions to fix it (e.g. "Ollama model not found. Run: autopentest models pull")
+
+#### 8.6 Models Commands (`cli/models.go`)
+```
+autopentest models pull         # Pull all 4 ArmurAI specialist models
+autopentest models list         # Show all models + versions + sizes
+autopentest models update       # Update to latest versions of all models
+autopentest models remove       # Remove all specialist models
+```
+- `models pull` shows a progress bar per model using `lipgloss` progress component
+- Model checksums verified after download against known-good hashes
+
+#### 8.7 Config Command (`cli/config.go`)
+```
+autopentest config init                      # Interactive setup wizard
+autopentest config set <key> <value>         # Set a config value
+autopentest config get <key>                 # Get a config value
+autopentest config show                      # Print full config (redacts secrets)
+autopentest config validate                  # Validate config file
+```
+- `config init` wizard: asks for provider choice, API key (if Claude), Ollama endpoint (if local), DB connection string; writes `config.yaml`; runs `doctor` at end to verify
+
+#### 8.8 Version & Update Commands
+```
+autopentest version             # Print version, commit hash, build date
+autopentest update              # Self-update to latest release via GitHub API
+```
+
+#### 8.9 Tests
+- `tests/unit/cli/scan_test.go`: verify `scan` command constructs correct campaign request from flags
+- `tests/unit/cli/doctor_test.go`: mock all services, verify each check runs and reports correctly
+- `tests/unit/cli/config_test.go`: verify `config set` writes correct value, `config validate` catches missing required fields
+
+**Acceptance Criteria:**
+- [ ] `autopentest scan example.com --scope example.com --follow` runs a campaign end-to-end with live terminal output
+- [ ] `autopentest doctor` identifies and clearly describes each failing check with fix instructions
+- [ ] `autopentest models pull` shows per-model progress bars and verifies checksums
+- [ ] Watch TUI renders agent thoughts in real-time with correct visual hierarchy
+- [ ] `autopentest --json campaign status <id>` outputs valid JSON parseable by `jq`
+- [ ] All commands print `--help` with correct usage, flags, and examples
+
+**Dependencies:** Sprints 0, 6, 7
+
+---
+
+### Sprint 9 — Web Dashboard
 **Duration:** 2 weeks
-**Goal:** A polished CLI for power users and a web UI for everyone else.
+**Goal:** A polished React dashboard that makes campaign activity visible and reports readable. The "demo moment" that drives sharing and stars.
 
-**Why this sprint matters:** The best backend in the world is useless if the interface is painful. Both interfaces need to feel professional and fast.
+**Why this sprint matters:** The web UI is what people screenshot and share. The live orchestrator thought stream is the feature that makes people say "holy shit, it's actually thinking." This drives GitHub stars more than any other single feature.
 
-#### CLI (`cli/main.py`)
-- Implement using `click` + `rich` (for beautiful terminal output):
-  ```bash
-  # Core commands
-  autopentest campaign new --target example.com --objective "find RCE" --scope "192.168.1.0/24"
-  autopentest campaign start <campaign-id>
-  autopentest campaign watch <campaign-id>   # live stream of orchestrator thoughts + actions
-  autopentest campaign stop <campaign-id>
-  autopentest campaign report <campaign-id> --format pdf --output ./report.pdf
+#### 9.1 Frontend Setup (`web/`)
+- Initialize Vite + React 18 + TypeScript
+- Install: `shadcn/ui`, `tailwindcss`, `@tanstack/react-query`, `zustand`, `wouter` (lightweight router), `recharts` (charts), `react-force-graph-2d` (attack surface graph)
+- Configure Vite to build static assets into `web/dist/`; embed `web/dist/` into Go binary using `//go:embed` directive — single binary serves the dashboard
 
-  # Config
-  autopentest config init          # interactive setup wizard
-  autopentest config set provider claude
-  autopentest config set api-key sk-ant-...
+#### 9.2 Dashboard Page (`web/src/pages/Dashboard.tsx`)
+- Active campaigns list: name, target, status badge, elapsed time, finding count (by severity), progress bar showing current phase
+- "New Scan" button: opens quick-scan modal (target + scope + objective, 3 fields)
+- Recent findings feed: last 10 findings across all campaigns with severity badge and truncated title
+- Stats bar: total campaigns, total findings by severity, models status
 
-  # Models
-  autopentest models pull          # pulls all 4 specialist models via Ollama
-  autopentest models status        # shows model availability + version
+#### 9.3 New Campaign Wizard (`web/src/pages/NewCampaign.tsx`)
+- Step 1 — Target: input for domain/IP, scope CIDR inputs (add/remove rows), objective text input with suggestion chips ("Find all vulns", "Find RCE", "Find auth bypasses", "Bug bounty scan")
+- Step 2 — Provider: radio between Claude (shows API key field) and Local LLM (shows Ollama endpoint + model dropdown populated from `GET /api/v1/models`)
+- Step 3 — Authorization: operator name field, date range for authorization window, generates signed token client-side, shows token for operator to copy/save
+- Step 4 — Review: summary of all settings, estimated time, "Launch Campaign" button
 
-  # Tools check
-  autopentest doctor               # checks all required tools are installed
-  ```
-- Implement `autopentest campaign watch`: streams SSE events from API, renders in terminal with `rich.live` — shows current phase, orchestrator reasoning (in dim text), tool executions, findings as they're discovered
-- Implement `autopentest doctor`: checks nmap, subfinder, httpx, ffuf, whatweb, nuclei, amass are installed and in PATH; checks Ollama is running; checks all 4 models are pulled; checks API keys if claude provider configured
+#### 9.4 Live Campaign View (`web/src/pages/CampaignLive.tsx`)
+- **Phase bar**: animated steps with current phase highlighted and spinner
+- **Orchestrator Thoughts** (center, largest panel): scrolling stream of agent reasoning text, arrives token by token via WebSocket; styled as a terminal — dark background, monospace font, reasoning in gray, decisions in white, tool calls in yellow, findings in green
+- **Attack Surface Map** (right panel): force-directed graph using `react-force-graph-2d`; nodes = discovered hosts/subdomains (sized by port count), edges = trust relationships; updates live as recon completes; hover shows host details
+- **Findings Feed** (bottom left): findings appear as cards as they're discovered, color-coded by severity; clicking a finding expands it
+- **Emergency Stop** button: top right, red, requires clicking twice (confirm dialog on first click)
+- Connect to WebSocket `GET /api/v1/campaigns/:id/events` using browser native WebSocket
 
-#### Web UI (`web/`)
-- Initialize React 18 + TypeScript + Vite
-- Component library: `shadcn/ui` + Tailwind CSS
-- State management: `TanStack Query` for server state, `Zustand` for UI state
+#### 9.5 Report Viewer (`web/src/pages/ReportViewer.tsx`)
+- Rendered HTML report displayed in-browser in an iframe
+- Left sidebar: findings index with severity badges, click to jump to finding section
+- Top bar: export buttons (PDF download, HTML download, JSON download, Markdown download)
+- Share button: copies a permalink to this report view
 
-**Key pages:**
+#### 9.6 Settings Page (`web/src/pages/Settings.tsx`)
+- Provider configuration: switch between Claude/Ollama/LM Studio, test connection button
+- Model management: table of 4 specialist models with version, size, status (pulled/not pulled), pull/update/remove actions
+- API Keys: list configured API keys with last-used date, create new key, revoke key
 
-- **Dashboard (`/`):** active campaigns list with live status, recent findings, quick-start button
-
-- **New Campaign (`/campaigns/new`):**
-  - Target input (domain or IP)
-  - Objective input (free text, with suggestions: "find RCE", "enumerate all vulnerabilities", "test authentication")
-  - Scope definition: IP range CIDR inputs, domain allowlist
-  - Provider selection: Claude (requires API key) or Local LLM (requires Ollama endpoint + model)
-  - Authorization: operator name + sign authorization token
-
-- **Live Campaign (`/campaigns/:id`):**
-  - Phase progress bar: Recon → Classify → Plan → Execute → Report
-  - **Orchestrator thoughts panel:** live stream of the orchestrator's reasoning (what it's thinking, what it's deciding) — this is the most engaging UI element
-  - **Findings feed:** findings appear in real-time as discovered, color-coded by severity
-  - **Tool execution log:** live command output as tools run
-  - **Attack surface map:** force-directed graph of discovered hosts/subdomains/relationships, updates in real-time
-  - Emergency stop button (prominent, red)
-
-- **Report Viewer (`/campaigns/:id/report`):**
-  - Rendered HTML report in-browser
-  - Sidebar: finding index, jump to section
-  - Export buttons: PDF, HTML, JSON, Markdown
-
-- **Settings (`/settings`):**
-  - Provider configuration: Claude API key, or Ollama/LM Studio endpoint
-  - Model management: pull/update specialist models
-  - Default scope templates
+#### 9.7 API Routes for Dashboard
+- `GET /api/v1/models`: list available Ollama models
+- `GET /api/v1/stats`: overall stats (campaign counts, finding counts, model status)
+- `GET /api/v1/reports/:id/html`: serve rendered HTML report
 
 **Acceptance Criteria:**
-- [ ] `autopentest doctor` correctly identifies missing tools and missing models
-- [ ] `autopentest campaign watch` renders live campaign activity in terminal
-- [ ] Web UI new campaign flow creates and starts a campaign end-to-end
-- [ ] Orchestrator thoughts stream correctly in the live campaign view
-- [ ] Report downloads as valid PDF from the report viewer
+- [ ] `web/dist` is embedded in Go binary — `./bin/autopentest serve` serves the dashboard with no separate web server
+- [ ] Live campaign view shows orchestrator thought stream within 1 second of campaign start
+- [ ] Attack surface graph updates in real-time as subdomains are discovered
+- [ ] Report viewer renders a full report and all 4 download formats work
+- [ ] New campaign wizard creates and starts a campaign without the user touching the CLI
 
-**Dependencies:** Sprints 5, 6
+**Dependencies:** Sprints 6, 7, 8
 
 ---
 
-### Sprint 8 — Synthetic Training Data Generation
+### Sprint 10 — Continuous ASM Engine
+**Duration:** 2 weeks
+**Goal:** Build the continuous attack surface monitoring engine — watches a defined scope, detects new and changed assets, automatically triggers targeted AI tests, and alerts on significant findings.
+
+**Why this sprint matters:** Point-in-time scans miss the constantly changing attack surface. New subdomains, new ports, new services appear every day. Continuous ASM closes the gap between scheduled pentests — this is what commercial tools charge $50k/year for.
+
+#### 10.1 Scope Watcher (`internal/asm/watcher.go`)
+- Implement `ScopeWatcher`:
+  - Manages a set of watched scopes, each with its own polling schedule (configurable per scope, default 24h)
+  - Uses goroutines + time.Ticker per scope for concurrent, independent polling
+  - On each tick: run recon tools against the scope, store snapshot in DB
+  - Compare snapshot with previous using `DiffEngine`
+  - If diff detected: emit `AssetChangeEvent` to a channel consumed by `TriggerEngine`
+
+#### 10.2 Asset Snapshot Store (`internal/asm/snapshot.go`)
+- Implement `SnapshotStore`:
+  - `Save(ctx, scopeID, snapshot AttackSurface) error`: persist to `asm_snapshots` table
+  - `GetLatest(ctx, scopeID string) (*AttackSurface, error)`: return most recent snapshot
+  - `GetHistory(ctx, scopeID string, limit int) ([]AttackSurface, error)`: return N most recent snapshots
+- Add migration `000004_asm.sql`: creates `asm_scopes`, `asm_snapshots`, `asm_asset_changes` tables
+
+#### 10.3 Diff Engine (`internal/asm/diff.go`)
+- Implement `DiffEngine.Diff(prev, curr AttackSurface) *AssetDiff`:
+  - `NewSubdomains []string`: in curr but not in prev
+  - `RemovedSubdomains []string`: in prev but not in curr
+  - `NewPorts map[string][]int`: new open ports per host
+  - `ClosedPorts map[string][]int`: closed ports per host
+  - `NewServices map[string][]ServiceRecord`: new services detected
+  - `NewEndpoints []EndpointRecord`: new web endpoints
+  - `ChangedTechnologies map[string][]string`: technology version changes
+- Implement `IsSignificant(diff *AssetDiff) bool`: returns true if diff contains new subdomains, new ports on critical services, or new endpoints — used to decide whether to auto-trigger a scan
+
+#### 10.4 Auto-Trigger Engine (`internal/asm/trigger.go`)
+- Implement `TriggerEngine`:
+  - Consumes `AssetChangeEvent` from watcher
+  - For each significant change: automatically create and start a new campaign targeting only the changed assets
+  - Campaign objective set to: `"Assess newly discovered asset: <asset>"` with scope limited to the new asset
+  - Respects rate limiting: max 3 auto-triggered campaigns per 24h per scope (prevents runaway scanning)
+  - All auto-triggered campaigns require a pre-configured authorization token stored in the scope config
+
+#### 10.5 ASM API (`internal/api/handlers/asm.go`)
+- `POST /api/v1/asm/scopes`: create watched scope with target, schedule, notification config
+- `GET /api/v1/asm/scopes`: list all watched scopes with status
+- `DELETE /api/v1/asm/scopes/:id`: stop watching a scope
+- `GET /api/v1/asm/scopes/:id/history`: asset change history with diff view
+- `POST /api/v1/asm/scopes/:id/scan-now`: trigger immediate scan without waiting for schedule
+
+#### 10.6 Notifications (`internal/asm/notify.go`)
+- Implement `Notifier` interface: `Notify(ctx, event AssetChangeEvent) error`
+- Implement `SlackNotifier`: posts to configured webhook with finding summary
+- Implement `EmailNotifier`: sends SMTP email with diff summary
+- Implement `WebhookNotifier`: posts JSON payload to configured URL
+- Notification content: new assets discovered, critical/high findings from auto-triggered campaigns, technology changes that match known CVEs
+
+#### 10.7 CLI Commands for ASM
+```
+autopentest asm add <target> --schedule 24h --scope <cidr>    # Start watching a scope
+autopentest asm list                                            # List watched scopes
+autopentest asm history <scope-id>                             # Show asset change history
+autopentest asm remove <scope-id>                              # Stop watching
+autopentest asm scan-now <scope-id>                            # Trigger immediate scan
+```
+
+**Acceptance Criteria:**
+- [ ] `ScopeWatcher` correctly detects a new subdomain added to a mock target between two scans
+- [ ] `DiffEngine` correctly identifies new ports, new subdomains, and technology version changes
+- [ ] Auto-trigger creates a campaign targeting only the changed assets, not the full scope
+- [ ] Rate limiting prevents more than 3 auto-triggered campaigns per 24h
+- [ ] Slack notification is sent within 60 seconds of a significant asset change being detected
+
+**Dependencies:** Sprints 3, 6
+
+---
+
+### Sprint 11 — Bug Bounty Workflow
+**Duration:** 2 weeks
+**Goal:** Build first-class bug bounty hunter support — read program scopes from HackerOne/Bugcrowd, track what's been tested, detect duplicate findings, and generate program-compliant reports.
+
+**Why this sprint matters:** Bug bounty hunters are one of the most active and vocal communities on GitHub. A tool that genuinely understands their workflow (scope management, dedup, report format) will spread through that community faster than any marketing.
+
+#### 11.1 HackerOne Client (`internal/bugbounty/hackerone.go`)
+- Implement `HackerOneClient`:
+  - `GetProgram(ctx, handle string) (*BugBountyProgram, error)`: `GET https://api.hackerone.com/v1/hackers/programs/{handle}` — fetch scope, policy, bounty table
+  - `GetScope(ctx, handle string) (*ProgramScope, error)`: extract in-scope and out-of-scope assets
+  - `GetSubmissions(ctx, handle string) ([]Submission, error)`: fetch previously submitted reports to enable dedup
+  - `SubmitReport(ctx, handle string, report SubmissionRequest) (*Submission, error)`: create a new report (optional, requires explicit flag)
+- Define `BugBountyProgram`: `Handle`, `Name`, `Policy`, `BountyTable`, `InScope []ScopeAsset`, `OutOfScope []ScopeAsset`
+- Define `ScopeAsset`: `AssetType string` (URL/domain/IP/app), `Identifier string`, `EligibleForBounty bool`, `MaxSeverity string`
+
+#### 11.2 Bugcrowd Client (`internal/bugbounty/bugcrowd.go`)
+- Implement `BugcrowdClient` with equivalent methods for Bugcrowd API v1
+- `GetTargetGroups(ctx, programCode string) ([]TargetGroup, error)`: fetch in-scope/out-of-scope targets
+- `GetSubmissions(ctx, programCode string) ([]Submission, error)`: fetch existing submissions for dedup
+
+#### 11.3 Scope Importer (`internal/bugbounty/scope_importer.go`)
+- Implement `ImportScope(ctx, program BugBountyProgram) (*ScopeDefinition, error)`:
+  - Converts program scope assets to `ScopeDefinition` (CIDRs, domains, ports)
+  - Automatically sets out-of-scope exclusions
+  - Validates imported scope is not empty before returning
+- This `ScopeDefinition` is passed directly to campaign creation — bug bounty users never need to manually define scope
+
+#### 11.4 Duplicate Detector (`internal/bugbounty/dedup.go`)
+- Implement `DuplicateDetector`:
+  - `IsDuplicate(ctx, finding ClassifiedFinding, program string) (bool, *Submission, error)`:
+    1. Fetch existing submissions for the program from HackerOne/Bugcrowd API
+    2. Compute semantic similarity between `finding.Description` and each existing submission title/description using pgvector embeddings
+    3. If cosine similarity > 0.85: flag as potential duplicate, return matching submission
+    4. Also check: same CVE ID on same asset, same URL with same vulnerability class
+  - `BatchCheck(ctx, findings []ClassifiedFinding, program string) map[uuid]DuplicateResult`
+
+#### 11.5 Bug Bounty Report Formatter (`internal/bugbounty/formatter.go`)
+- Implement `FormatForHackerOne(finding ClassifiedFinding, evidence []Evidence) HackerOneReport`:
+  - `Title`: concise, follows H1 conventions (e.g. "Reflected XSS in /search parameter `q`")
+  - `VulnerabilityInformation`: technical writeup with steps to reproduce, impact, CVSS
+  - `SeverityRating`: mapped from CVSS score to H1's `none|low|medium|high|critical`
+  - `ProofOfConcept`: formatted command output / screenshot evidence
+  - `RecommendedFix`: remediation guidance
+- Implement `FormatForBugcrowd(finding ClassifiedFinding, evidence []Evidence) BugcrowdReport`
+
+#### 11.6 Bug Bounty Mode Campaign Flow
+- When `--mode bugbounty` is set on `autopentest scan`:
+  1. Prompt for program handle
+  2. Fetch scope from HackerOne/Bugcrowd, display it, confirm with user
+  3. Import scope as `ScopeDefinition` — use directly for scope enforcement
+  4. After classification: run `DuplicateDetector.BatchCheck` on all findings
+  5. Mark duplicates in `ClassifiedFindingSet` — orchestrator skips them
+  6. After campaign: generate report with HackerOne/Bugcrowd-formatted finding sections
+  7. Optionally submit: `--submit` flag enables direct submission via API (with confirmation prompt)
+
+#### 11.7 CLI Commands for Bug Bounty
+```
+autopentest scan <handle> --mode bugbounty [flags]
+  --program string     HackerOne handle or Bugcrowd code
+  --submit             Submit confirmed findings via API (requires confirmation)
+  --format h1|bc       Report format (hackerone or bugcrowd)
+
+autopentest bb programs                    # List configured programs
+autopentest bb scope <handle>              # Show program scope
+autopentest bb submissions <handle>        # List previous submissions
+```
+
+**Acceptance Criteria:**
+- [ ] `HackerOneClient.GetScope` correctly parses in-scope and out-of-scope assets for a real H1 program
+- [ ] Scope importer converts H1 scope to `ScopeDefinition` with correct CIDR/domain entries
+- [ ] Duplicate detector flags a finding with cosine similarity > 0.85 to an existing submission
+- [ ] H1 report format passes H1's report submission validation (no required fields missing)
+- [ ] Bug bounty mode auto-imports scope and user never needs to manually define `--scope`
+
+**Dependencies:** Sprints 2, 4, 6, 7
+
+---
+
+### Sprint 12 — Synthetic Training Data Generation
 **Duration:** 2 weeks
 **Goal:** Generate high-quality synthetic training datasets for all four specialist models using Claude as the data generation engine.
 
-**Why this sprint matters:** The fine-tuned models are the moat. The quality of fine-tuning is entirely determined by the quality of training data. This sprint builds the data pipelines that make the moat defensible.
+**Why this sprint matters:** The fine-tuned models are the moat. Training data quality determines model quality. A well-curated dataset cannot be copied by forking the repository.
 
-#### Data Generation Framework (`data/generator.py`)
-- Implement `SyntheticDataGenerator` using Claude API:
-  - Generates instruction-response pairs at scale
-  - Validates each generated sample against a schema before saving
-  - Deduplicates using embedding similarity (reject samples too similar to existing ones)
-  - Saves in Alpaca format (instruction, input, output) and ShareGPT format (conversations)
+#### 12.1 Data Generator Framework (`training/generate_data.py`)
+- Implement `SyntheticDataGenerator` using `anthropic` Python SDK:
+  - `generate_batch(prompt_template, variables, n) -> list[dict]`: generates N samples by varying `variables` in the prompt template
+  - `validate(sample, schema) -> bool`: validates each generated sample against a Pydantic schema
+  - `deduplicate(samples) -> list[dict]`: removes samples with embedding cosine similarity > 0.9
+  - `score_quality(sample) -> float`: prompts Claude to score sample 1-5 on accuracy, completeness, format; keeps only ≥4
+  - Outputs Alpaca-format JSONL: `{"instruction": "...", "input": "...", "output": "..."}`
+  - Outputs ShareGPT-format JSONL: `{"conversations": [{"from": "human", "value": "..."}, {"from": "gpt", "value": "..."}]}`
 
-#### Recon Agent Training Data (`data/recon/`)
-- **Dataset goal:** 50,000 instruction-response pairs
-- **Format:** input = raw tool output(s), output = structured `AttackSurface` JSON
-- **Generation strategy:**
-  - Generate realistic nmap XML outputs for 10,000 synthetic host profiles (varying OS, services, versions)
-  - Generate matching subfinder outputs (subdomain lists with varying patterns)
-  - Generate httpx outputs for each discovered web service
-  - Prompt Claude: "Given this raw tool output, extract a structured attack surface model. Identify the most interesting findings. Correlate findings across tools."
-  - Validate output parses against `AttackSurface` Pydantic model
-- **Data variety:** corporate networks, cloud-heavy environments, legacy infrastructure, web application focused, mixed environments
+#### 12.2 Recon Agent Training Data (`training/generate_recon_data.py`)
+- **Target:** 50,000 samples
+- **Format:** input = raw tool output (nmap XML + subfinder JSON + httpx JSONL), output = structured `AttackSurface` JSON
+- **Generation:**
+  - Define 200 synthetic host profiles: varies OS, open ports, services, versions, web apps
+  - For each profile: generate realistic nmap XML, subfinder subdomain list, httpx output using Claude
+  - Prompt Claude to produce the correct `AttackSurface` JSON given those tool outputs
+  - Include edge cases: hosts with no open ports, hosts with unusual services, heavily filtered hosts
+- **Splits:** 45,000 train / 4,000 validation / 1,000 test
 
-#### Classifier Agent Training Data (`data/classifier/`)
-- **Dataset goal:** 30,000 instruction-response pairs
-- **Format:** input = finding description + context, output = `ClassifiedFinding` JSON (CVE IDs, CVSS, severity, attack category, false_positive_probability)
-- **Generation strategy:**
-  - Source real CVE descriptions from NVD (public data)
-  - Generate synthetic finding descriptions for each CVE with varying levels of detail
-  - Generate false positive examples: generic findings that look interesting but aren't
-  - Prompt Claude: "Classify this security finding. Map to CVE if applicable. Assign CVSS score. Is this a false positive? What attack category?"
+#### 12.3 Classifier Agent Training Data (`training/generate_classifier_data.py`)
+- **Target:** 30,000 samples
+- **Format:** input = `RawFinding` JSON, output = `ClassifiedFinding` JSON with CVE, CVSS, severity, category
+- **Generation:**
+  - Source 5,000 real CVE descriptions from NVD (public data) as ground truth
+  - Generate 3 synthetic finding descriptions per CVE (varying detail level, scanner output format)
+  - Generate 5,000 false positive examples: realistic-looking findings that are actually benign
+  - Generate 5,000 multi-CVE findings: one finding maps to multiple CVEs
+- **Splits:** 27,000 train / 2,000 validation / 1,000 test
 
-#### Exploit Agent Training Data (`data/exploit/`)
-- **Dataset goal:** 40,000 instruction-response pairs (most complex — needs the most data)
-- **Format:** input = `ClassifiedFindingSet` + objective, output = `AttackPlan` JSON with chain-of-thought reasoning
-- **Generation strategy:**
-  - Synthesize from public CTF writeups: parse HackTheBox, TryHackMe, VulnHub writeups into finding → attack chain → result structures (use Claude to parse and structure)
-  - Synthesize from public pentest reports (HackerOne disclosed reports, Synack public reports)
-  - Generate novel scenarios: create synthetic target profiles with 3-8 findings, prompt Claude to construct attack chains with full reasoning
-  - **Include `<think>` traces**: for DeepSeek R1 fine-tuning, include chain-of-thought reasoning before each answer
-- **Data variety:** web application attacks, network pivoting, privilege escalation chains, cloud misconfigurations, combination attacks
+#### 12.4 Exploit Agent Training Data (`training/generate_exploit_data.py`)
+- **Target:** 40,000 samples (most data, hardest task)
+- **Format:** input = `ClassifiedFindingSet` JSON + objective, output = `AttackPlan` JSON with `<think>` chain-of-thought
+- **Generation sources:**
+  - Parse 2,000 public CTF writeups (HackTheBox, TryHackMe, VulnHub) into finding → attack chain structures using Claude
+  - Parse 500 public HackerOne disclosed reports into finding → exploitation path structures
+  - Generate 15,000 novel scenarios: synthetic target profiles with 3-8 findings, Claude constructs attack chains with full reasoning
+  - Generate 5,000 negative examples: findings that don't chain, dead-end attack paths
+- **Include `<think>` traces:** every sample has explicit chain-of-thought before JSON output — required for DeepSeek R1 fine-tuning
+- **Splits:** 36,000 train / 3,000 validation / 1,000 test
 
-#### Report Agent Training Data (`data/report/`)
-- **Dataset goal:** 20,000 instruction-response pairs
-- **Format:** input = campaign findings + evidence summary, output = professional report section
-- **Generation strategy:**
-  - Source public pentest report templates and examples
-  - Generate synthetic finding → executive_summary pairs
-  - Generate synthetic finding → technical_writeup pairs
-  - Generate synthetic campaign_data → full_report pairs
-  - Ensure variety in: tone (corporate vs startup), severity level, finding types, remediation approaches
+#### 12.5 Report Agent Training Data (`training/generate_report_data.py`)
+- **Target:** 20,000 samples
+- **Format:** input = campaign findings summary, output = report section (executive summary / finding writeup / remediation)
+- **Generation sources:**
+  - Source structure from public pentest report templates and example reports
+  - Generate 5,000 executive summary samples: varying finding types, target industries, severity distributions
+  - Generate 10,000 individual finding writeup samples: all OWASP Top 10 categories, all severity levels
+  - Generate 5,000 remediation plan samples: varying priorities, technical contexts
+- **Splits:** 18,000 train / 1,000 validation / 1,000 test
 
-#### Data Quality Pipeline
-- Implement automated quality scoring: each generated sample scored 1-5 on accuracy, completeness, format correctness
-- Filter: only samples scoring ≥4 go into training set
-- Implement diversity metrics: ensure training set covers all target types, severity levels, attack categories
-- Output statistics: samples per category, average quality score, coverage analysis
+#### 12.6 Data Quality Pipeline (`training/quality_pipeline.py`)
+- Implement automated quality gates:
+  - Schema validation: every sample passes its Pydantic schema
+  - Claude quality scoring: samples scoring <4/5 are discarded
+  - Diversity check: compute token distribution per field; flag if one value dominates >20% of samples
+  - Embedding dedup: remove samples with >0.9 cosine similarity to any existing sample
+- Implement dataset statistics report: samples per category, average quality score, coverage analysis per vulnerability type
+- All datasets versioned with hash in filename: `recon_v1_50k_a3f2b1.jsonl`
 
 **Acceptance Criteria:**
-- [ ] Data generator produces valid Alpaca-format JSONL for all four datasets
-- [ ] Recon dataset contains ≥50k samples with valid `AttackSurface` JSON outputs
-- [ ] Exploit dataset contains ≥40k samples with chain-of-thought reasoning traces
-- [ ] Quality filter correctly rejects malformed or low-quality samples
-- [ ] Dataset diversity report shows coverage across all intended categories
+- [ ] Data generator produces valid Alpaca-format JSONL with no schema violations
+- [ ] Recon dataset: 50k samples, 100% valid `AttackSurface` JSON outputs
+- [ ] Exploit dataset: 40k samples, 100% contain `<think>` reasoning traces before JSON
+- [ ] Quality pipeline rejects samples scoring <4/5 and produces statistics report
+- [ ] Deduplication removes at least 5% of generated samples (verifies dedup is working)
 
-**Dependencies:** Sprint 0 (Claude API access)
+**Dependencies:** Sprint 0 (Claude API access), Sprint 2 (data model schemas)
 
 ---
 
-### Sprint 9 — Model Fine-Tuning
+### Sprint 13 — Model Fine-Tuning & Publishing
 **Duration:** 2 weeks
-**Goal:** Fine-tune all four specialist models on their respective datasets and publish to HuggingFace Hub.
+**Goal:** Fine-tune all four specialist models on curated datasets and publish to `ArmurAI` on HuggingFace Hub.
 
-**Why this sprint matters:** This sprint creates the proprietary models that differentiate the platform from any fork or competitor.
+**Why this sprint matters:** This sprint creates the proprietary models that are the platform's moat. A competitor can fork the code. They cannot fork the models without the training data and compute.
 
-#### Fine-Tuning Infrastructure (`training/`)
-- Use **Unsloth** for efficient fine-tuning: 2x faster than standard HuggingFace training, 70% less VRAM, supports Qwen/Mistral/Llama/DeepSeek
-- Use **QLoRA** (4-bit quantization + LoRA adapters): fine-tune on consumer hardware (24GB VRAM GPU sufficient)
-- Training infrastructure: scripts runnable on single A100 (Modal/RunPod/Lambda Labs) or locally with RTX 4090
+#### 13.1 Fine-Tuning Infrastructure (`training/`)
+- Use **Unsloth** for all fine-tuning: 2× faster than standard HuggingFace, 70% less VRAM, supports all 4 base models
+- Use **QLoRA** (4-bit quantization + LoRA): fine-tune on single A100 (80GB) or 2× RTX 4090 (24GB each)
+- All training scripts parameterized via config, reproducible with fixed seeds
+- Training runs on RunPod/Lambda Labs GPU instances; `training/Makefile` automates spin-up and teardown
+- All checkpoints saved to HuggingFace Hub every 500 steps (resumable if interrupted)
 
-#### Recon Model Fine-Tuning (`training/train_recon.py`)
-- Base model: `Qwen/Qwen2.5-7B-Instruct`
-- Dataset: `data/recon/train.jsonl` (50k samples)
-- LoRA config: `r=64`, `lora_alpha=16`, target modules: `q_proj, v_proj, k_proj, o_proj, gate_proj, up_proj, down_proj`
-- Training: 3 epochs, batch size 4, gradient accumulation 8, cosine LR schedule
-- Evaluation: held-out 5k sample test set; measure `AttackSurface` JSON validity rate, field accuracy
-- Target: >95% valid JSON output, >90% field extraction accuracy vs Claude-generated ground truth
-- Publish: `ArmurAI/recon-agent-qwen2.5-7b` on HuggingFace Hub
+#### 13.2 Recon Model (`training/train_recon.py`)
+- Base: `Qwen/Qwen2.5-7B-Instruct`
+- Dataset: `data/recon/recon_v1_50k_*.jsonl` (45k train / 4k val)
+- LoRA config: `r=64`, `lora_alpha=16`, target modules: all linear layers
+- Training: 3 epochs, batch 4, grad accumulation 8, cosine LR schedule, warmup 100 steps
+- Eval metric: `AttackSurface` JSON validity rate on 1k test set; target >95%
+- Publish: `ArmurAI/recon-agent-qwen2.5-7b` with model card documenting: base model, dataset stats, eval results, usage example
 
-#### Classifier Model Fine-Tuning (`training/train_classifier.py`)
-- Base model: `mistralai/Mistral-7B-Instruct-v0.3`
-- Dataset: `data/classifier/train.jsonl` (30k samples)
-- Same LoRA config, 2 epochs
-- Evaluation: CVE mapping accuracy, CVSS score mean absolute error, false positive recall
-- Target: >85% CVE mapping accuracy, CVSS MAE <0.5, >90% false positive recall
+#### 13.3 Classifier Model (`training/train_classifier.py`)
+- Base: `mistralai/Mistral-7B-Instruct-v0.3`
+- Dataset: `data/classifier/classifier_v1_30k_*.jsonl` (27k train / 2k val)
+- LoRA config: `r=64`, `lora_alpha=16`, 2 epochs
+- Eval metrics: CVE mapping accuracy, CVSS MAE, FP recall; targets: >85% CVE accuracy, CVSS MAE <0.5, >90% FP recall
 - Publish: `ArmurAI/classifier-agent-mistral-7b`
 
-#### Exploit Model Fine-Tuning (`training/train_exploit.py`)
-- Base model: `deepseek-ai/DeepSeek-R1-Distill-Llama-8B` (R1 reasoning in an 8B model)
-- Dataset: `data/exploit/train.jsonl` (40k samples, includes `<think>` traces)
-- LoRA config: `r=128` (higher rank for complex reasoning task), 3 epochs
-- Evaluation: attack plan validity rate, step sequence coherence, technique-finding alignment
-- Target: >85% valid `AttackPlan` JSON, expert evaluation score >4/5 on 200 sampled outputs
+#### 13.4 Exploit Model (`training/train_exploit.py`)
+- Base: `deepseek-ai/DeepSeek-R1-Distill-Llama-8B`
+- Dataset: `data/exploit/exploit_v1_40k_*.jsonl` (36k train / 3k val)
+- LoRA config: `r=128` (higher rank — complex reasoning task), 3 epochs
+- Special: do NOT filter out `<think>` tokens; they are part of the training target for R1 models
+- Eval metrics: `AttackPlan` JSON validity rate, step sequence coherence score, expert eval on 200 sampled outputs (1-5 scale); target: >85% valid JSON, expert score >4/5
 - Publish: `ArmurAI/exploit-agent-deepseek-r1-8b`
 
-#### Report Model Fine-Tuning (`training/train_report.py`)
-- Base model: `meta-llama/Llama-3.1-8B-Instruct`
-- Dataset: `data/report/train.jsonl` (20k samples)
-- 2 epochs, focus on instruction following and format consistency
-- Evaluation: BLEU/ROUGE vs reference reports, human evaluation on 100 sampled reports
-- Target: ROUGE-L >0.6, human evaluation >4/5 on professionalism + completeness
+#### 13.5 Report Model (`training/train_report.py`)
+- Base: `meta-llama/Llama-3.1-8B-Instruct`
+- Dataset: `data/report/report_v1_20k_*.jsonl` (18k train / 1k val)
+- LoRA config: `r=64`, 2 epochs
+- Eval metrics: ROUGE-L vs reference reports, human eval on 100 samples; target: ROUGE-L >0.6, human score >4/5
 - Publish: `ArmurAI/report-agent-llama3.1-8b`
 
-#### Model Registry (`models/registry.py`)
-- Implement `ModelRegistry`: tracks available models, versions, download status
-- Implement `models pull`: downloads all 4 fine-tuned models from HuggingFace Hub to local Ollama
-- Implement version pinning: `config.yaml` specifies exact model version for reproducibility
-- Implement model health check: verify model responds correctly to a test prompt before campaign start
+#### 13.6 Model Registry & Versioning (`internal/models/registry.go`)
+- Implement `ModelRegistry`:
+  - `Pull(ctx, modelName, version string) error`: downloads from HuggingFace Hub via Ollama pull; verifies SHA256 checksum
+  - `List(ctx) ([]ModelInfo, error)`: lists available models with version, size, pulled status
+  - `IsAvailable(ctx, modelName string) bool`: checks if model is pulled and responding to test prompt
+  - `Update(ctx, modelName string) error`: pull latest version if newer than installed
+- Version pins: `internal/models/versions.go` — constants for each model's current production version; updated on each model release
+- `autopentest models pull` calls `ModelRegistry.Pull` for all 4 models
+
+#### 13.7 Model Cards (HuggingFace)
+- Write `README.md` for each model on HuggingFace with:
+  - What the model does (one paragraph)
+  - How it fits into the Auto-Pentest-GPT-AI architecture
+  - Base model and training approach
+  - Evaluation results with numbers
+  - Usage example (how to call it via Ollama)
+  - Limitations and responsible use notice
 
 **Acceptance Criteria:**
-- [ ] All four models fine-tuned and uploaded to HuggingFace Hub
-- [ ] Recon model achieves >95% valid JSON output on test set
-- [ ] Exploit model produces coherent multi-step attack plans on 10 manually evaluated scenarios
-- [ ] `autopentest models pull` successfully downloads and registers all four models
-- [ ] Models run correctly via Ollama on a Mac with 16GB RAM
+- [ ] All 4 models published to `ArmurAI` org on HuggingFace Hub
+- [ ] Recon model achieves >95% valid JSON on 1k test set
+- [ ] Exploit model achieves >85% valid `AttackPlan` JSON on 1k test set
+- [ ] `autopentest models pull` downloads all 4 models and verifies checksums
+- [ ] All 4 models run via Ollama on a MacBook Pro M2 with 16GB RAM without OOM errors
 
-**Dependencies:** Sprint 8
+**Dependencies:** Sprint 12
 
 ---
 
-### Sprint 10 — Integration, Testing & Launch Prep
+### Sprint 14 — API, Documentation & Developer Experience
 **Duration:** 2 weeks
-**Goal:** End-to-end testing, documentation, Docker packaging, and everything needed for a compelling public launch.
+**Goal:** Complete REST API with OpenAPI spec, comprehensive documentation covering every feature, and a developer SDK. This is what turns users into contributors and integrators.
 
-**Why this sprint matters:** 200 stars without promotion means there's an audience waiting. The launch needs to be polished enough that those 200 become 2,000 in the first week.
+**Why this sprint matters:** Documentation is not optional — it is the product for developers. Every hour spent on clear docs pays back 10x in reduced support burden and increased adoption. This sprint treats docs as a first-class deliverable.
 
-#### Integration Testing
-- Set up test lab environment: intentionally vulnerable VMs (Metasploitable 3, DVWA, VulnHub machines) in isolated Docker network
-- Write end-to-end test suite: `tests/e2e/` — runs full campaign against test lab, validates:
-  - At least 3 findings discovered on Metasploitable 3
-  - Attack plan constructed from findings
-  - At least 1 successful exploitation step
-  - Report generated with correct structure
-- Write agent unit tests: mock LLM responses, verify each agent correctly processes inputs and produces valid outputs
-- Write scope enforcement tests: verify out-of-scope attacks are blocked at every layer
+#### 14.1 REST API Completion (`internal/api/`)
+- Complete all API routes with consistent error responses:
+  - All errors: `{"error": {"code": "SCOPE_VIOLATION", "message": "...", "details": {...}}}`
+  - All success lists: `{"data": [...], "meta": {"total": N, "page": 1, "per_page": 20}}`
+  - All timestamps in RFC3339 format
+- Rate limiting: 100 req/min per API key using Redis token bucket
+- Authentication: `X-API-Key` header, keys stored as bcrypt hashes in DB; generate via `autopentest config api-key create`
+- CORS: allow configured origins (for dashboard on different port during development)
 
-#### Performance Optimization
-- Profile campaign execution: identify bottlenecks in tool execution and agent response times
-- Implement parallel recon: run subfinder, nmap, httpx concurrently where safe
-- Implement result streaming: recon findings stream to orchestrator as each tool completes (don't wait for all tools to finish)
-- Target: full recon + classify + plan in <10 minutes for a medium-complexity target
+#### 14.2 OpenAPI Specification
+- Annotate all Fiber handlers with `swag` doc comments
+- Run `swag init` to generate `docs/swagger.json` and `docs/swagger.yaml`
+- Serve Swagger UI at `GET /api/docs` in development mode
+- Every endpoint documented with: description, all parameters, all possible response schemas, example request and response bodies
+- Publish OpenAPI spec to `docs/api-reference.md` as rendered Markdown for GitHub browsing
 
-#### Docker Packaging
-- Write `docker/Dockerfile.controller`: multi-stage build, Python app + all CLI tools (nmap, subfinder, httpx, etc.) pre-installed
-- Write `docker-compose.yml`: controller + Ollama (with GPU passthrough config) + PostgreSQL + Redis
-- Write `docker-compose.cpu.yml`: CPU-only variant (slower but runs on any machine)
-- Test on: macOS (Apple Silicon), Ubuntu 22.04, Windows 11 (WSL2)
-- Target image size: <2GB controller image (tools add bulk, optimize with multi-stage)
+#### 14.3 Documentation Site (`docs/`)
+- Write `docs/README.md`: documentation index, links to all doc pages
+- Write `docs/quickstart.md`:
+  - Prerequisites: Go 1.22, Docker, Ollama
+  - 5 commands from zero to first completed scan
+  - Expected output at each step
+  - What to do if each step fails
+- Write `docs/architecture.md`:
+  - System architecture diagram (Mermaid, rendered as PNG)
+  - Description of each component and its responsibilities
+  - Data flow walkthrough: trace a single finding from recon tool output through all agents to report
+  - Decision log: why Go, why these 4 base models, why custom agent framework
+- Write `docs/cli-reference.md`:
+  - Every command documented with: description, syntax, all flags with types/defaults/descriptions, examples (at least 3 per command), common error messages and fixes
+  - Generated from Cobra's built-in `--help` output plus manual additions
+- Write `docs/api-reference.md`:
+  - Generated from OpenAPI spec
+  - Every endpoint: method + path, description, authentication requirement, request body schema, response schemas, example curl request, example response
+- Write `docs/configuration.md`:
+  - Every field in `config.yaml` documented: type, default, valid values, description, which component uses it
+  - Environment variable override names for every field
+  - Example configs for 3 deployment scenarios: local development, team server, CI/CD integration
+- Write `docs/providers.md`:
+  - Step-by-step setup for Claude (get API key, set in config, verify with `doctor`)
+  - Step-by-step setup for Ollama (install, pull models, configure endpoint, verify)
+  - Step-by-step setup for LM Studio (download, load model, enable server, configure endpoint)
+  - Comparison table: capability, privacy, cost, setup effort
+- Write `docs/continuous-asm.md`:
+  - What continuous ASM is and why it matters
+  - How to add a watched scope
+  - How notifications work (Slack/email/webhook setup)
+  - How auto-triggered campaigns work and how to configure them
+  - How to read the asset change history
+- Write `docs/bug-bounty.md`:
+  - How to connect HackerOne / Bugcrowd account
+  - How bug bounty mode works end-to-end
+  - How duplicate detection works
+  - How to generate and submit reports
+  - Example workflow: morning routine for a bug bounty hunter
+- Write `docs/fine-tuning.md`:
+  - Overview of the 4 models and their roles
+  - How to reproduce fine-tuning (requirements, commands, expected time and cost)
+  - How to contribute training data (format, quality criteria, submission process)
+  - How to add a new specialist model to the architecture
 
-#### Documentation
-- Rewrite `README.md`: architecture diagram, quick start (5 commands to first campaign), feature list, model descriptions, FAQ
-- Write `docs/quickstart.md`: step-by-step from zero to first campaign in 15 minutes
-- Write `docs/architecture.md`: deep dive on agent architecture, data flow, model choices
-- Write `docs/fine-tuning.md`: how to reproduce fine-tuning, dataset format, how to contribute training data
-- Write `docs/configuration.md`: every config option explained
-- Write `docs/providers.md`: how to set up Claude, Ollama, LM Studio
-- Write `CONTRIBUTING.md`: how to add new recon tools, how to contribute training data, how to improve agent prompts
+#### 14.4 Python SDK (`sdk/python/`)
+- Create separate Python package `autopentest-sdk` in `sdk/python/`
+- `pip install autopentest-sdk` installable package
+- Implement `AutoPentestClient`:
+  ```python
+  client = AutoPentestClient(api_url="http://localhost:8080", api_key="...")
+  campaign = client.campaigns.create(target="example.com", objective="find RCE", scope=["example.com"])
+  campaign.start()
+  for event in campaign.stream():          # streaming generator
+      print(event.type, event.data)
+  report = campaign.get_report(format="json")
+  ```
+- Full async variant: `AsyncAutoPentestClient` with `async for event in campaign.astream()`
+- Publish to PyPI under `autopentest-sdk`
+- Write `sdk/python/README.md` with complete usage examples
+- Write `sdk/python/examples/`: 3 example scripts (basic scan, bug bounty scan, continuous ASM integration)
 
-#### Launch Assets
-- Create architecture diagram (Mermaid + rendered PNG) for README
-- Record demo GIF: `autopentest campaign watch` running against a test target — shows orchestrator reasoning in real-time
-- Write HackerNews/Reddit launch post draft
-- Tag `v1.0.0` release with compiled binaries for macOS/Linux via GitHub Actions + GoReleaser
+#### 14.5 Contributing Guide
+- Write `CONTRIBUTING.md`:
+  - How to set up development environment
+  - How to add a new recon tool (step-by-step with example)
+  - How to add a new CLI command (step-by-step)
+  - How to contribute training data (format + quality standards)
+  - Code style guide (Go formatting, naming conventions, error handling patterns)
+  - PR review checklist
+  - How to report security vulnerabilities (responsible disclosure)
 
 **Acceptance Criteria:**
-- [ ] End-to-end test against Metasploitable 3 finds at least 3 real vulnerabilities and generates a valid report
-- [ ] `docker compose up` produces a working platform with no manual configuration steps
-- [ ] Full campaign on a simple target completes in <15 minutes
-- [ ] README clearly explains the 5-agent architecture and how to run first campaign
-- [ ] GitHub Actions CI pipeline runs full test suite on PR
+- [ ] Every API endpoint returns consistent error format on failure
+- [ ] `docs/quickstart.md` takes a new user from zero to first completed scan in under 15 minutes (verified by user test)
+- [ ] OpenAPI spec validates against OpenAPI 3.0 schema with zero errors
+- [ ] Python SDK `client.campaigns.create(...).start()` creates and starts a real campaign
+- [ ] Every CLI command has at least 3 documented examples in `docs/cli-reference.md`
+- [ ] `docs/configuration.md` covers every field in `config.example.yaml`
 
-**Dependencies:** Sprints 0–9
-
----
-
-## Fine-Tuning Data Strategy Summary
-
-| Model | Base | Training Samples | Key Data Sources | Target Metric |
-|---|---|---|---|---|
-| Recon Agent | Qwen 2.5 7B | 50,000 | Synthetic tool outputs, real scan patterns | >95% valid JSON |
-| Classifier | Mistral 7B | 30,000 | NVD CVE data, synthetic findings | >85% CVE accuracy |
-| Exploit Agent | DeepSeek R1 8B | 40,000 | CTF writeups, HackerOne reports, synthetic chains | >85% valid plan JSON |
-| Report Agent | Llama 3.1 8B | 20,000 | Public pentest reports, synthetic findings | ROUGE-L >0.6 |
+**Dependencies:** Sprints 8, 9
 
 ---
 
-## Technology Stack
+### Sprint 15 — Distribution & Ecosystem
+**Duration:** 2 weeks
+**Goal:** Make Auto-Pentest-GPT-AI available through every channel a security professional, developer, or team might use. Zero friction from discovery to first scan.
 
-| Component | Technology |
-|---|---|
-| Orchestrator | Python 3.12 asyncio |
-| LLM (Claude) | `anthropic` Python SDK |
-| LLM (Local) | Ollama API / LM Studio OpenAI-compatible API |
-| Recon Agent LLM | Qwen 2.5 7B (fine-tuned, via Ollama) |
-| Classifier Agent LLM | Mistral 7B (fine-tuned, via Ollama) |
-| Exploit Agent LLM | DeepSeek R1 8B (fine-tuned, via Ollama) |
-| Report Agent LLM | Llama 3.1 8B (fine-tuned, via Ollama) |
-| Fine-Tuning | Unsloth + QLoRA |
-| API | FastAPI |
-| Database | PostgreSQL 16 |
-| Task Queue | Redis + asyncio |
-| CLI | Click + Rich |
-| Web UI | React 18 + TypeScript + shadcn/ui |
-| Recon Tools | nmap, subfinder, httpx, ffuf, whatweb, nuclei, gau, amass |
-| Deployment | Docker + docker-compose |
-| Model Hosting | HuggingFace Hub (`ArmurAI` org) |
-| CI/CD | GitHub Actions |
+**Why this sprint matters:** The best tool in the world is useless if people can't install it. Distribution is not an afterthought — it is the difference between 200 stars and 20,000.
+
+#### 15.1 Go Release Binary (GitHub Actions)
+- Write `.github/workflows/release.yml`: triggers on `git tag v*`
+- Build matrix: `GOOS=linux GOARCH=amd64`, `GOOS=linux GOARCH=arm64`, `GOOS=darwin GOARCH=amd64`, `GOOS=darwin GOARCH=arm64`, `GOOS=windows GOARCH=amd64`
+- Embed web dashboard (`web/dist/`) in binary using `//go:embed`
+- Strip debug info (`-ldflags="-s -w"`) to minimize binary size
+- Sign binaries with `cosign` (supply chain security)
+- Generate SHA256 checksums file
+- Create GitHub Release with: changelog (from `CHANGELOG.md`), all binaries, checksums, release notes template
+
+#### 15.2 Homebrew Tap (`deploy/homebrew/`)
+- Create `armur-ai/homebrew-tap` repository
+- Write `Formula/autopentest.rb`:
+  - Downloads correct binary for OS/arch from GitHub Release
+  - Verifies SHA256 checksum
+  - Installs binary to `$(brew --prefix)/bin/autopentest`
+  - Installs shell completions for bash/zsh/fish
+  - Runs `autopentest doctor` as post-install check
+- Write GitHub Actions in the tap repo to auto-update formula on new releases
+- Test: `brew install armur-ai/tap/autopentest` on macOS arm64 and amd64
+
+#### 15.3 Linux Install Script (`deploy/install.sh`)
+```bash
+curl -sSL https://install.autopentest.ai/install.sh | sh
+```
+- Detects OS and architecture
+- Downloads correct binary from GitHub Releases
+- Verifies SHA256 checksum
+- Installs to `/usr/local/bin/autopentest`
+- Sets up shell completions
+- Runs `autopentest doctor` to verify installation
+- Idempotent: safe to run multiple times
+- Hosts at `install.autopentest.ai` (Cloudflare Pages, static file serving)
+
+#### 15.4 Docker Images
+- Write `deploy/docker/Dockerfile`:
+  - Multi-stage build: stage 1 builds Go binary + React assets; stage 2 is minimal Alpine + binary
+  - All native Go security tools compiled into the binary (no subprocess for subfinder/httpx/etc.)
+  - Tools that require external install (nuclei templates): downloaded on first run
+  - Final image: ~150MB
+- Write `deploy/docker/Dockerfile.gpu`: extends base with Ollama pre-installed, models downloaded on first run
+- Push to Docker Hub: `armurai/autopentest:latest`, `armurai/autopentest:v{version}`, `armurai/autopentest:gpu`
+- Push to GitHub Container Registry: `ghcr.io/armur-ai/autopentest`
+- Write GitHub Actions to push on every release tag
+
+#### 15.5 Docker Compose (`deploy/docker-compose.yml`)
+- Services: `autopentest` (Go backend + dashboard), `postgres`, `redis`, `ollama`
+- `ollama` service: starts Ollama, then runs model pull for all 4 specialist models on first startup (using entrypoint script with `ollama pull` commands)
+- First-run experience: `docker compose up` → wait ~10 min for models to download → visit `http://localhost:8080` → dashboard is live
+- Write `deploy/docker-compose.gpu.yml`: enables GPU passthrough for Ollama (NVIDIA CUDA + AMD ROCm variants)
+- Write `deploy/docker-compose.dev.yml`: adds hot-reload, mounts source code, enables debug logging
+- Write `deploy/docker-compose.yml` README section explaining every service and env var
+
+#### 15.6 npm Package (`deploy/npm/`)
+- Create `@armurai/autopentest` npm package
+- `npx @armurai/autopentest scan <target>`: downloads correct platform binary on first run, runs it
+- `package.json`: `bin` field pointing to node shim that downloads binary if not present
+- Shim downloads from GitHub Releases, verifies checksum, caches at `~/.autopentest/bin/`
+- Publish to npm registry
+- Usage: `npx @armurai/autopentest scan example.com --scope example.com` with no prior installation
+
+#### 15.7 Shell Completions
+- Implement Cobra completion commands: `autopentest completion bash`, `autopentest completion zsh`, `autopentest completion fish`, `autopentest completion powershell`
+- Homebrew formula installs completions automatically
+- Docker image includes completions in `/etc/bash_completion.d/`
+- `docs/quickstart.md` includes one-liner to add completions to shell profile
+
+#### 15.8 Helm Chart (`deploy/helm/autopentest/`)
+- Write Helm chart for Kubernetes deployment:
+  - `Chart.yaml`: name, version, description, dependencies (postgresql, redis bitnami charts)
+  - `values.yaml`: all configurable values with defaults and comments
+  - `templates/deployment.yaml`: autopentest deployment with resource limits, liveness/readiness probes
+  - `templates/ollama-deployment.yaml`: Ollama deployment with GPU node selector and model init container
+  - `templates/service.yaml`, `templates/ingress.yaml`
+  - `templates/hpa.yaml`: HorizontalPodAutoscaler for API replicas
+  - `templates/secret.yaml`: manages API keys and DB credentials
+- Test: `helm install autopentest ./deploy/helm/autopentest` deploys cleanly to a test K8s cluster
+- Publish chart to GitHub Pages Helm repository
+
+#### 15.9 GitHub Repository Polish
+- Write root `README.md` with:
+  - One-sentence description + screenshot of live watch TUI
+  - Architecture diagram (Mermaid rendered as PNG)
+  - Feature list with icons
+  - Quick install section: 3 tabs — Homebrew / Docker / Linux
+  - Quick start: 3 commands to first scan
+  - Agent roster table
+  - HuggingFace model links
+  - Contributing + community links
+- Write `CHANGELOG.md` following Keep a Changelog format
+- Configure GitHub repository: description, topics (`penetration-testing`, `security`, `ai`, `golang`, `bug-bounty`, `llm`, `agents`), website URL, social preview image
+- Enable GitHub Discussions for community Q&A
+- Write issue templates: bug report, feature request, training data contribution
+
+**Acceptance Criteria:**
+- [ ] `brew install armur-ai/tap/autopentest` installs and runs on macOS arm64
+- [ ] `curl -sSL https://install.autopentest.ai/install.sh | sh` installs on Ubuntu 22.04
+- [ ] `npx @armurai/autopentest scan example.com --scope example.com` runs without prior installation
+- [ ] `docker compose up` reaches a working dashboard state with no manual steps beyond waiting for model downloads
+- [ ] `helm install autopentest ./deploy/helm/autopentest` deploys all services to test K8s cluster
+- [ ] GitHub Release includes signed binaries for all 5 platform/arch combinations with checksum file
+
+**Dependencies:** Sprints 8, 9, 13
+
+---
+
+### Sprint 16 — End-to-End Testing & Launch Preparation
+**Duration:** 1 week
+**Goal:** Comprehensive testing against real vulnerable targets, performance hardening, and everything needed for a polished public launch.
+
+#### 16.1 Test Lab Setup
+- Spin up intentionally vulnerable targets in isolated Docker network:
+  - `webgoat/goat-and-wolf` (OWASP WebGoat — known web vulns)
+  - `vulhub/` containers (known CVE reproductions)
+  - Custom target: a deliberately misconfigured web app with: SQLi, XSS, exposed `.git`, default credentials, exposed admin panel
+- Write `tests/e2e/full_campaign_test.go`: runs complete campaign against WebGoat, asserts:
+  - At least 5 findings discovered
+  - At least 1 Critical or High severity finding classified
+  - Attack plan constructed with at least 2 paths
+  - Report generated with all sections populated
+  - Campaign completes in under 20 minutes
+
+#### 16.2 Performance Benchmarks
+- Benchmark recon phase: measure time from `ReconAgent.Execute` start to `AttackSurface` returned
+  - Target: under 5 minutes for a domain with <20 subdomains
+- Benchmark classification: measure time for `ClassifierAgent.Classify` on 50 findings
+  - Target: under 60 seconds
+- Benchmark report generation: time from `ReportAgent.Generate` call to PDF written
+  - Target: under 90 seconds
+- Profile memory usage during a full campaign: target peak <2GB RAM
+- Identify and fix top 3 bottlenecks found in profiling
+
+#### 16.3 Security Review
+- Review all subprocess executions: verify scope validation is called for every one
+- Review all DB queries: verify parameterized queries everywhere, no string concatenation
+- Review API authentication: verify every endpoint requires API key except health check
+- Review file writes: verify no user-controlled input reaches file paths without sanitization
+- Fix all findings before launch
+
+#### 16.4 Launch Assets
+- Record demo GIF (15 seconds): `autopentest scan --follow` showing live watch TUI — orchestrator thoughts scrolling, findings appearing, completion
+- Record demo video (3 minutes): full walkthrough from install to report download, posted to YouTube
+- Write HackerNews launch post: "Show HN: Auto-Pentest-GPT-AI — autonomous AI pentesting in Go with 4 fine-tuned specialist models"
+- Write Reddit posts for: r/netsec, r/bugbounty, r/golang, r/selfhosted
+- Create Twitter/X thread: architecture diagram + demo GIF + key differentiators
+- Tag `v1.0.0` release
+
+**Acceptance Criteria:**
+- [ ] E2E test finds at least 5 real vulnerabilities in WebGoat and generates a valid PDF report
+- [ ] Full campaign completes in under 20 minutes on a MacBook Pro M2
+- [ ] Zero security review findings remain unresolved at launch
+- [ ] Demo GIF clearly shows live orchestrator thought streaming
+- [ ] `v1.0.0` GitHub Release is published with all distribution artifacts
+
+**Dependencies:** Sprints 0–15
 
 ---
 
 ## Success Metrics
 
-- **GitHub stars:** 2,000+ in first month post-relaunch (vs 200 organic baseline)
-- **End-to-end campaign time:** <15 minutes on a simple target
-- **Finding accuracy:** >80% of discovered findings confirmed as real vulnerabilities
-- **Report quality:** rated >4/5 by security professionals in user testing
-- **Model performance:** all four fine-tuned models outperform their base models on domain-specific benchmarks
-- **Community:** contributions of new recon tool integrations, training data, playbooks within 30 days of launch
+| Metric | Target |
+|---|---|
+| GitHub stars (month 1) | 2,000+ |
+| GitHub stars (month 6) | 10,000+ |
+| Full campaign time (simple target) | <20 minutes |
+| Recon phase time (<20 subdomains) | <5 minutes |
+| Finding accuracy (real vs false positive) | >80% real findings |
+| Report quality score | >4/5 by security professionals |
+| Recon model JSON validity | >95% |
+| Exploit model plan validity | >85% |
+| `docker compose up` to working dashboard | <15 min (model download included) |
 
 ---
 
 ## What Makes This Defensible
 
-1. **Four proprietary fine-tuned models** — the data flywheel improves them with every release
-2. **Multi-agent architecture** — each model is narrow and deep, not a general model trying to do everything
-3. **The right base model per task** — Qwen for parsing, DeepSeek R1 for reasoning, Llama for writing, Mistral for classification
-4. **Full privacy option** — runs 100% locally, no data leaves the machine
-5. **Orchestrator flexibility** — Claude for best results, local LLM for air-gapped/private deployments
-6. **End-to-end** — recon through reporting in one platform, not a collection of disconnected tools
+1. **Four proprietary fine-tuned models** — the data flywheel improves them with every release; cannot be replicated by forking the repo
+2. **Go-native single binary** — `brew install` in one command; no Python runtime, no pip hell
+3. **Native Go security tool integration** — subfinder/httpx/nuclei/naabu as libraries, not subprocesses
+4. **Continuous ASM** — the only open-source tool that autonomously watches your attack surface and triggers AI tests on changes
+5. **Bug bounty workflow** — reads H1/Bugcrowd scope, deduplicates, formats reports correctly; nobody else does this
+6. **Full privacy option** — 100% local with Ollama, nothing leaves your machine
+7. **Multi-agent architecture** — each model is narrow and deep; the right base model per task (Qwen/Mistral/DeepSeek R1/Llama)
