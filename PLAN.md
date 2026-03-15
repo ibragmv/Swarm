@@ -120,7 +120,7 @@ Most security tools collect data or execute commands. None of them *think*. Auto
 | Database | PostgreSQL 16 + pgvector | Campaign history + semantic search |
 | Cache | Redis 7 | Session state, rate limiting |
 | Container execution | Docker API (docker/docker client-go) | Isolated tool execution |
-| Web dashboard | React 18 + TypeScript + shadcn/ui | Clean, fast, embeddable |
+| Web dashboard | Next.js 15 + TypeScript + shadcn/ui + tremor | Dark-first, chart-heavy, enterprise-grade |
 | CLI | Cobra + lipgloss + bubbletea | Beautiful terminal UI |
 | Fine-tuning | Python + Unsloth + QLoRA | Offline, GPU machine only |
 | Model hosting | HuggingFace Hub (`ArmurAI` org) | Consistent with existing `ArmurAI/Pentest_AI` |
@@ -1172,15 +1172,38 @@ autopentest update              # Self-update to latest release via GitHub API
 **Why this sprint matters:** The web UI is what people screenshot and share. The live orchestrator thought stream is the feature that makes people say "holy shit, it's actually thinking." This drives GitHub stars more than any other single feature.
 
 #### 9.1 Frontend Setup (`web/`)
-- Initialize Vite + React 18 + TypeScript
-- Install: `shadcn/ui`, `tailwindcss`, `@tanstack/react-query`, `zustand`, `wouter` (lightweight router), `recharts` (charts), `react-force-graph-2d` (attack surface graph)
-- Configure Vite to build static assets into `web/dist/`; embed `web/dist/` into Go binary using `//go:embed` directive — single binary serves the dashboard
+- Initialize **Next.js 15** (App Router) + TypeScript — gives us SSR, file-based routing, server components, and better SEO for the public-facing pages
+- **Dark-first design**: entire dashboard is dark theme by default (think Linear, Vercel Dashboard, or Warp terminal aesthetic). Charcoal backgrounds (`#0A0A0F`), subtle borders (`#1A1A2E`), accent colors for severity (red/orange/yellow/blue). No light mode needed — security tools live in the dark.
+- Install:
+  - `shadcn/ui` — component library (dark theme presets, consistent design tokens)
+  - `tailwindcss` — utility styling
+  - `@tanstack/react-query` — server state management
+  - `zustand` — client state (WebSocket data, panel state)
+  - `tremor` — beautiful pre-built dashboard charts (area, bar, donut, tracker) with dark mode
+  - `recharts` — custom charts where tremor doesn't cover it
+  - `react-force-graph-2d` / `react-force-graph-3d` — attack surface graph (toggle between 2D/3D)
+  - `@xyflow/react` (React Flow) — attack path DAG visualization with custom nodes
+  - `framer-motion` — animations (node pop-in, card transitions, number counters)
+  - `lucide-react` — icons
+  - `cmdk` — command palette (`Cmd+K` to search findings, jump to campaigns, run commands)
+- Build: `next build && next export` to static assets in `web/out/`; embed into Go binary using `//go:embed`
+- The dashboard must feel like enterprise security software — dense with information, beautiful charts, smooth animations, zero jank
 
-#### 9.2 Dashboard Page (`web/src/pages/Dashboard.tsx`)
-- Active campaigns list: name, target, status badge, elapsed time, finding count (by severity), progress bar showing current phase
-- "New Scan" button: opens quick-scan modal (target + scope + objective, 3 fields)
-- Recent findings feed: last 10 findings across all campaigns with severity badge and truncated title
-- Stats bar: total campaigns, total findings by severity, models status
+#### 9.2 Dashboard Home (`web/app/dashboard/page.tsx`)
+- **Command palette**: `Cmd+K` opens a cmdk palette — search campaigns, findings, jump to any page, start a scan
+- **KPI Cards** (top row, 4-6 cards with tremor):
+  - Total campaigns (with sparkline of campaigns per week)
+  - Active scans (live count with pulsing indicator)
+  - Total findings (with severity breakdown mini-bars)
+  - Critical/High findings (big red number, with trend arrow vs last week)
+  - Average scan time (with trend)
+  - Model status (green/yellow/red indicators for each of the 4 agents)
+- **Active Campaigns Table** (center): name, target, status badge (animated for running), current phase, elapsed time, finding count by severity (colored dots), progress bar. Click to open live view.
+- **Findings Over Time** (tremor AreaChart): stacked area chart of findings discovered per day, colored by severity. Last 30 days.
+- **Severity Distribution** (tremor DonutChart): animated donut showing Critical/High/Medium/Low/Info across all campaigns
+- **Top Vulnerable Assets** (tremor BarList): horizontal bars showing which assets have the most findings
+- **Recent Activity Feed** (right sidebar): last 20 events across all campaigns — findings, state changes, completions — with timestamps and severity badges
+- **"New Scan" button**: prominent, top-right, opens quick-scan modal (target + scope + objective, 3 fields)
 
 #### 9.3 New Campaign Wizard (`web/src/pages/NewCampaign.tsx`)
 - Step 1 — Target: input for domain/IP, scope CIDR inputs (add/remove rows), objective text input with suggestion chips ("Find all vulns", "Find RCE", "Find auth bypasses", "Bug bounty scan")
