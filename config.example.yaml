@@ -1,0 +1,121 @@
+# autopentest configuration
+# Copy this to config.yaml and fill in your values.
+# All values can be overridden via environment variables prefixed with AUTOPENTEST_
+# Example: AUTOPENTEST_ORCHESTRATOR_API_KEY=sk-ant-...
+
+# --- Server ---
+server:
+  host: "0.0.0.0"          # API server bind address
+  port: 8080               # API server port
+
+# --- Database ---
+database:
+  host: "localhost"
+  port: 5432
+  user: "autopentest"
+  password: ""             # REQUIRED — set via AUTOPENTEST_DATABASE_PASSWORD
+  name: "autopentest"
+  sslmode: "disable"       # disable, require, verify-ca, verify-full
+
+# --- Redis ---
+redis:
+  host: "localhost"
+  port: 6379
+  password: ""
+  db: 0
+
+# --- Orchestrator (main AI) ---
+orchestrator:
+  provider: "claude"       # claude, ollama, lmstudio
+  model: "claude-sonnet-4-6" # Model to use for orchestration
+  api_key: ""              # REQUIRED for Claude — set via AUTOPENTEST_ORCHESTRATOR_API_KEY
+  endpoint: ""             # Required for ollama/lmstudio (e.g. http://localhost:11434)
+  context_window: 200000   # Max context window size in tokens
+  max_tokens: 8192         # Max output tokens per completion
+  temperature: 0.1         # Lower = more deterministic
+
+# --- Specialist Agent Models ---
+# These run via Ollama by default. Pull with: autopentest models pull
+agents:
+  recon:
+    model: "ArmurAI/recon-agent-qwen2.5-7b"
+    endpoint: "http://localhost:11434"
+  classifier:
+    model: "ArmurAI/classifier-agent-mistral-7b"
+    endpoint: "http://localhost:11434"
+  exploit:
+    model: "ArmurAI/exploit-agent-deepseek-r1-8b"
+    endpoint: "http://localhost:11434"
+  report:
+    model: "ArmurAI/report-agent-llama3.1-8b"
+    endpoint: "http://localhost:11434"
+
+# --- Security Tool Settings ---
+tools:
+  default_timeout: 300     # Default tool timeout in seconds
+  subfinder:
+    recursive: false       # Recursive subdomain enumeration
+    timeout: 300
+    rate_limit: 10         # Requests per second
+  httpx:
+    follow_redirects: true
+    timeout: 30            # Per-request timeout in seconds
+    threads: 50
+  nuclei:
+    template_path: ""      # Custom template directory (leave empty for default)
+    severity:              # Minimum severity levels to scan
+      - critical
+      - high
+      - medium
+    rate_limit: 150        # Requests per second
+    timeout: 300
+  naabu:
+    ports: "top-1000"      # Port specification: "top-100", "top-1000", "80,443,8080"
+    rate: 1000             # Packets per second
+    timeout: 300
+  katana:
+    depth: 3               # Crawl depth
+    js_crawl: true         # Enable JavaScript-aware crawling
+    timeout: 300
+
+# --- Scope Enforcement ---
+scope:
+  enforce_strict: true     # ALWAYS true — cannot be disabled. Safety constraint.
+
+# --- Continuous ASM ---
+asm:
+  enabled: false           # Enable continuous attack surface monitoring
+  default_schedule: "24h"  # How often to re-scan watched scopes
+  max_auto_campaigns: 3    # Max auto-triggered campaigns per 24h per scope
+  notification_slack: ""   # Slack webhook URL for ASM alerts
+  notification_email: ""   # Email address for ASM alerts
+
+# --- Bug Bounty ---
+bugbounty:
+  hackerone_api_key: ""    # HackerOne API key
+  hackerone_username: ""   # HackerOne username
+  bugcrowd_api_key: ""     # Bugcrowd API key
+
+# --- Shared Intelligence Network ---
+intelligence:
+  enabled: false           # Must be explicitly enabled (opt-in)
+  share_patterns: false    # Contribute anonymized patterns to community
+  consume_patterns: false  # Use community patterns to improve scans
+  api_endpoint: "https://api.autopentest.ai"
+
+# --- Integrations ---
+integrations:
+  jira:
+    url: ""                # Jira instance URL (e.g. https://company.atlassian.net)
+    api_token: ""
+    project: ""            # Default project key
+    issue_type: "Bug"      # Default issue type
+  slack:
+    bot_token: ""          # Slack bot token (xoxb-...)
+    signing_secret: ""
+    channel: ""            # Default channel for notifications
+
+# --- Logging ---
+logging:
+  level: "info"            # debug, info, warn, error
+  format: "console"        # console (human-readable) or json (structured)
