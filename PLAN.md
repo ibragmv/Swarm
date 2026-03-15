@@ -1008,14 +1008,84 @@ campaign report flags:
 ```
 
 #### 8.4 Live Watch TUI (`cli/ui/watch.go`)
-- Implement using `bubbletea` — a full terminal UI with live updates:
-  - **Header bar**: campaign ID, target, objective, elapsed time, current state
-  - **Phase progress**: horizontal steps bar — `Recon → Classify → Plan → Execute → Report` with current step highlighted
-  - **Agent thoughts panel** (largest area): scrollable log of orchestrator reasoning text, streamed token by token, newest at bottom; dim gray for reasoning, bright white for decisions, yellow for tool calls
-  - **Findings ticker** (right sidebar): live count of findings by severity, updates as findings are discovered
-  - **Current action**: last tool dispatched + status (running / complete / failed)
-  - **Footer**: keyboard shortcuts — `q` quit watch (keeps campaign running), `s` stop campaign, `r` open report when complete, `↑↓` scroll thoughts
-- Connect to WebSocket `GET /api/v1/campaigns/:id/events`; render each event type appropriately
+- Implement using `bubbletea` + `lipgloss` + `bubbles` — a full terminal dashboard, not just a log viewer.
+- Think `lazygit` meets `k9s` but for pentesting. This is the "holy shit" moment in the terminal.
+- Layout (responsive, adapts to terminal size):
+  ```
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  autopentest · example.com · "Find all vulns" · ⏱ 3m42s · RECON   │
+  │  ████████████░░░░░░░░░░  Recon → Classify → Plan → Execute → Report│
+  ├───────────────────────────────────────┬─────────────────────────────┤
+  │  🤖 Agent Activity                    │  📊 Findings                │
+  │                                       │                             │
+  │  ┌ Orchestrator ─────────────────┐   │  CRITICAL  ██  2            │
+  │  │ Analyzing recon results...    │   │  HIGH      ████  4          │
+  │  │ "Found 12 subdomains, 3 have │   │  MEDIUM    ██████  6        │
+  │  │  exposed admin panels..."     │   │  LOW       ███  3           │
+  │  └───────────────────────────────┘   │  INFO      █  1             │
+  │  ┌ Recon Agent ──────────────────┐   │                             │
+  │  │ ✓ subfinder  12 subdomains    │   │  Latest:                    │
+  │  │ ⟳ httpx     probing...       │   │  🔴 SQLi in /api/search     │
+  │  │ ○ nuclei    waiting          │   │  🟠 XSS in /comments        │
+  │  │ ○ naabu     waiting          │   │  🟡 CORS misconfiguration   │
+  │  └───────────────────────────────┘   │                             │
+  │  ┌ Classifier ───────────────────┐   ├─────────────────────────────┤
+  │  │ idle — waiting for recon      │   │  🗺  Attack Surface         │
+  │  └───────────────────────────────┘   │                             │
+  │  ┌ Exploit Agent ────────────────┐   │  example.com                │
+  │  │ idle — waiting for classify   │   │  ├── api.example.com :443   │
+  │  └───────────────────────────────┘   │  ├── admin.example.com :80  │
+  │                                       │  ├── staging.example.com    │
+  │                                       │  │   ├── :80 (nginx 1.18)  │
+  │                                       │  │   └── :8080 (tomcat)    │
+  │                                       │  └── cdn.example.com       │
+  ├───────────────────────────────────────┴─────────────────────────────┤
+  │  ⚔  Attack Paths                                                    │
+  │  Path 1 (78% success): SQLi → Data Extraction → Credential Access  │
+  │  Path 2 (45% success): SSRF → Internal Network → Admin Panel       │
+  │  Path 3 (30% success): XSS → Session Hijack → Privilege Escalation │
+  ├─────────────────────────────────────────────────────────────────────┤
+  │  q:quit  s:stop  tab:switch panel  /:filter  e:expand  r:report    │
+  └─────────────────────────────────────────────────────────────────────┘
+  ```
+
+- **Panels** (switchable with `Tab`, each can be expanded to full screen with `e`):
+
+  1. **Agent Activity Panel** (top-left):
+     - Shows ALL 4 agents + orchestrator simultaneously with real-time status
+     - Each agent box shows: name, status (idle/running/complete/failed), current action, latest output snippet
+     - Orchestrator box shows streamed reasoning text token by token
+     - Agent boxes light up green when active, dim when idle
+     - Tool progress within each agent: ✓ complete, ⟳ running with spinner, ○ pending
+
+  2. **Findings Panel** (top-right):
+     - Severity histogram with colored bars (real-time, bars grow as findings arrive)
+     - Latest findings list with severity badge and truncated title
+     - Select a finding with arrow keys → shows full detail in expanded view
+     - `Enter` on a finding shows: description, CVE, CVSS vector, evidence, remediation
+
+  3. **Attack Surface Tree** (right):
+     - ASCII tree view of discovered infrastructure: domains → subdomains → ports → services
+     - Updates live as recon discovers new assets
+     - Color-coded: red for hosts with critical findings, yellow for medium, green for clean
+     - Expandable/collapsible nodes
+
+  4. **Attack Paths Panel** (bottom):
+     - Shows constructed attack chains as ranked paths
+     - Each path: name, success probability bar, step sequence with arrows
+     - Currently executing step highlighted with ⟳ spinner
+     - Step results shown inline: ✓ success (green), ✗ failed (red), ⟳ running
+     - Expand a path to see full step details including commands and output
+
+- **Navigation**: `Tab` cycles panels, `↑↓` scrolls within panel, `e` expands current panel to full screen, `Esc` returns to multi-panel, `/` opens filter, `?` shows all keybindings
+
+- **Interactive Recon Explorer** (accessible via `autopentest campaign explore <id>`):
+  - Full-screen bubbletea TUI for browsing the attack surface after recon completes
+  - Tree navigation: domain → subdomain → host → port → service → findings on that service
+  - Search/filter: `/nginx` highlights all nginx services, `/critical` shows only critical findings
+  - Export: `x` exports current view to JSON or Markdown
+
+- Connect to WebSocket `GET /api/v1/campaigns/:id/events`; render each event type to the appropriate panel
 
 #### 8.5 Doctor Command (`cli/doctor.go`)
 ```
@@ -1083,7 +1153,11 @@ autopentest update              # Self-update to latest release via GitHub API
 - [ ] `autopentest scan example.com --scope example.com --follow` runs a campaign end-to-end with live terminal output
 - [ ] `autopentest doctor` identifies and clearly describes each failing check with fix instructions
 - [ ] `autopentest models pull` shows per-model progress bars and verifies checksums
-- [ ] Watch TUI renders agent thoughts in real-time with correct visual hierarchy
+- [ ] Watch TUI shows all 4 agents simultaneously with real-time status in multi-panel layout
+- [ ] Attack surface tree in TUI updates live as recon discovers subdomains/ports
+- [ ] Attack paths panel shows exploitation chains with success probability and live execution status
+- [ ] `Tab` cycles between panels, `e` expands to full-screen, `Esc` returns to multi-panel
+- [ ] `autopentest campaign explore <id>` opens interactive recon data browser with search/filter
 - [ ] `autopentest --json campaign status <id>` outputs valid JSON parseable by `jq`
 - [ ] All commands print `--help` with correct usage, flags, and examples
 
@@ -1115,10 +1189,70 @@ autopentest update              # Self-update to latest release via GitHub API
 - Step 4 — Review: summary of all settings, estimated time, "Launch Campaign" button
 
 #### 9.4 Live Campaign View (`web/src/pages/CampaignLive.tsx`)
-- **Phase bar**: animated steps with current phase highlighted and spinner
-- **Orchestrator Thoughts** (center, largest panel): scrolling stream of agent reasoning text, arrives token by token via WebSocket; styled as a terminal — dark background, monospace font, reasoning in gray, decisions in white, tool calls in yellow, findings in green
-- **Attack Surface Map** (right panel): force-directed graph using `react-force-graph-2d`; nodes = discovered hosts/subdomains (sized by port count), edges = trust relationships; updates live as recon completes; hover shows host details
-- **Findings Feed** (bottom left): findings appear as cards as they're discovered, color-coded by severity; clicking a finding expands it
+- This is the flagship page — the one people screenshot and share. Every element updates in real-time via WebSocket. Resizable panels using a grid layout.
+
+- **Phase Progress Bar** (top):
+  - Animated horizontal steps: `Recon → Classify → Plan → Execute → Adapt → Report`
+  - Current phase has pulsing glow animation
+  - Completed phases show green checkmark with duration
+  - Click a completed phase to see its summary
+
+- **Agent Activity Monitor** (top-left panel):
+  - 5 cards arranged vertically: Orchestrator, Recon, Classifier, Exploit, Report
+  - Each card shows: agent name, status badge (idle/active/complete/error), current action
+  - Active agents pulse with a subtle border animation
+  - **Orchestrator card is expanded by default**: shows streamed reasoning text token by token, terminal-style (dark bg, monospace). Reasoning in gray, decisions in white, tool calls in yellow `>>`, findings in green `[!]`. Auto-scrolls but user can scroll up to review
+  - Click any agent card to expand it and see full activity log
+
+- **Attack Surface Graph** (center panel, the visual centerpiece):
+  - Force-directed graph using `react-force-graph-2d` (or `react-force-graph-3d` with toggle)
+  - **Nodes**:
+    - Root target (large, centered)
+    - Subdomains (medium, clustered by parent domain)
+    - Hosts/IPs (connected to subdomains)
+    - Open ports shown as small satellite nodes around their host
+    - Services labeled on edges between host and port
+  - **Node styling**:
+    - Size = number of findings on that asset
+    - Color = highest severity finding (red/orange/yellow/green/gray)
+    - Pulsing animation on nodes with new findings
+  - **Edges**: domain → subdomain (solid), subdomain → IP (dashed), IP → port (thin)
+  - **Live updates**: nodes appear with a pop-in animation as recon discovers assets
+  - **Hover**: tooltip showing full details (hostname, IP, ports, services, technologies, finding count)
+  - **Click**: opens side drawer with full asset detail (all ports, all findings, all evidence)
+  - **Controls**: zoom, pan, toggle 2D/3D, toggle labels, filter by severity, search
+
+- **Attack Path Visualizer** (center panel, tab alongside Attack Surface):
+  - Directed acyclic graph showing exploitation chains
+  - Each node = an attack step (styled as a card with technique name + MITRE ATT&CK ID)
+  - Each edge = "leads to" relationship with success probability label
+  - **Color coding**:
+    - Green nodes: successfully executed steps
+    - Red nodes: failed steps
+    - Blue nodes: pending/planned steps
+    - Yellow nodes: currently executing (with spinner)
+  - Multiple paths shown as separate branches from the root finding
+  - Click a step node to see: command executed, output, duration, evidence
+  - Path ranking sidebar: paths sorted by success probability, click to highlight a path
+  - **MITRE ATT&CK overlay**: optional view mapping each step to its ATT&CK technique/tactic
+  - Animates in real-time as the exploit agent executes steps
+
+- **Findings Feed** (right panel):
+  - Findings appear as cards as they're discovered, with slide-in animation
+  - Each card: severity badge (colored), title, CVSS score pill, affected asset, timestamp
+  - Click to expand: full description, CVE links, evidence code blocks, remediation
+  - Filter bar: filter by severity, category, asset
+  - Sort: by severity (default), by time, by CVSS score
+  - Severity histogram at top: animated bar chart that grows in real-time
+
+- **Real-Time Metrics Bar** (bottom):
+  - Gauges/counters updating live:
+    - Findings: total count with severity breakdown mini-bars
+    - Scan progress: percentage based on milestones completed
+    - Token usage: input/output tokens consumed (with cost estimate for Claude)
+    - Time elapsed and estimated time remaining
+    - Assets discovered: subdomain count, host count, endpoint count
+
 - **Emergency Stop** button: top right, red, requires clicking twice (confirm dialog on first click)
 - Connect to WebSocket `GET /api/v1/campaigns/:id/events` using browser native WebSocket
 
@@ -1128,7 +1262,31 @@ autopentest update              # Self-update to latest release via GitHub API
 - Top bar: export buttons (PDF download, HTML download, JSON download, Markdown download)
 - Share button: copies a permalink to this report view
 
-#### 9.6 Settings Page (`web/src/pages/Settings.tsx`)
+#### 9.6 Campaign Analytics Page (`web/src/pages/CampaignAnalytics.tsx`)
+- Post-campaign deep dive — the "debrief" view:
+  - **Campaign Timeline**: horizontal Gantt-style chart showing what each agent did and when
+    - Rows: Orchestrator, Recon, Classifier, Exploit, Report
+    - Blocks: colored by activity type (tool call, LLM call, idle)
+    - Hover a block to see details (which tool, which prompt, duration)
+    - Shows concurrency: where agents worked in parallel vs sequentially
+  - **Attack Graph** (static, post-campaign): full attack surface + attack paths overlaid
+    - Toggle: show/hide successful paths, failed paths, untested paths
+    - Export as SVG/PNG for inclusion in reports and presentations
+  - **Finding Distribution**: charts (recharts)
+    - Severity pie chart
+    - Findings by category (bar chart)
+    - CVSS score distribution (histogram)
+    - Findings by asset (treemap)
+  - **Agent Performance**:
+    - Token usage per agent (stacked bar)
+    - Time spent per agent (stacked bar)
+    - Parse success rate per agent
+  - **Remediation Tracker**:
+    - Checklist of all findings with remediation status (open/in-progress/fixed/accepted-risk)
+    - Priority ordering by CVSS × exploitability
+    - Export as CSV for importing into Jira/Linear
+
+#### 9.7 Settings Page (`web/src/pages/Settings.tsx`)
 - Provider configuration: switch between Claude/Ollama/LM Studio, test connection button
 - Model management: table of 4 specialist models with version, size, status (pulled/not pulled), pull/update/remove actions
 - API Keys: list configured API keys with last-used date, create new key, revoke key
@@ -1141,9 +1299,14 @@ autopentest update              # Self-update to latest release via GitHub API
 **Acceptance Criteria:**
 - [ ] `web/dist` is embedded in Go binary — `./bin/autopentest serve` serves the dashboard with no separate web server
 - [ ] Live campaign view shows orchestrator thought stream within 1 second of campaign start
-- [ ] Attack surface graph updates in real-time as subdomains are discovered
+- [ ] Attack surface graph updates in real-time as subdomains are discovered — nodes pop in with animation
+- [ ] Attack path visualizer shows exploitation chains with live execution status (green/red/blue/yellow nodes)
+- [ ] Agent activity monitor shows all 5 agents simultaneously with real-time status
+- [ ] Campaign analytics page shows agent timeline, finding distribution charts, and performance metrics
+- [ ] MITRE ATT&CK overlay correctly maps attack steps to techniques
 - [ ] Report viewer renders a full report and all 4 download formats work
 - [ ] New campaign wizard creates and starts a campaign without the user touching the CLI
+- [ ] Real-time metrics bar shows live token usage, finding count, and progress estimate
 
 **Dependencies:** Sprints 6, 7, 8
 
