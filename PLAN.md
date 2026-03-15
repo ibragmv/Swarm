@@ -71,6 +71,22 @@ Most security tools collect data or execute commands. None of them *think*. Auto
 └──────────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────────────────┐
+│                    EXTENSION LAYER                                │
+│                                                                   │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────────────────┐ │
+│  │ MCP Server   │ │ GitHub Action│ │ Plugin System             │ │
+│  │ Claude Desktop│ │ CI/CD scans │ │ YAML playbooks · custom  │ │
+│  │ Cursor · IDEs│ │ per PR/push  │ │ tools · report templates │ │
+│  └──────────────┘ └──────────────┘ └──────────────────────────┘ │
+│                                                                   │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────────────────┐ │
+│  │ CTF Mode     │ │ Integrations │ │ Agent Memory              │ │
+│  │ HTB · THM    │ │ Jira · Slack │ │ Cross-engagement learning│ │
+│  │ auto-solve   │ │ SIEM · SOAR  │ │ per-user intelligence    │ │
+│  └──────────────┘ └──────────────┘ └──────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
 │         Python (offline · separate · one-time only)              │
 │   Fine-tuning pipeline → ArmurAI/* on HuggingFace Hub           │
 └──────────────────────────────────────────────────────────────────┘
@@ -166,6 +182,28 @@ auto-pentest-gpt-ai/
 │   │   ├── bugcrowd.go          # Bugcrowd API client
 │   │   ├── dedup.go             # Duplicate finding detection
 │   │   └── formatter.go         # Program-compliant report format
+│   ├── plugins/
+│   │   ├── loader.go            # Plugin discovery & loading
+│   │   ├── playbook.go          # YAML playbook parser & executor
+│   │   ├── registry.go          # Community playbook registry client
+│   │   └── types.go             # Plugin interfaces
+│   ├── memory/
+│   │   ├── store.go             # Cross-engagement memory store
+│   │   ├── patterns.go          # Attack pattern learning
+│   │   └── embeddings.go        # Semantic memory with pgvector
+│   ├── mcp/
+│   │   ├── server.go            # MCP protocol server
+│   │   ├── tools.go             # MCP tool definitions
+│   │   └── resources.go         # MCP resource providers
+│   ├── ctf/
+│   │   ├── solver.go            # CTF auto-solve orchestration
+│   │   ├── platforms.go         # HTB/THM API clients
+│   │   └── writeup.go           # Auto-writeup generation
+│   ├── integrations/
+│   │   ├── jira.go              # Jira issue creation
+│   │   ├── slack.go             # Slack notifications & bot
+│   │   ├── siem.go              # SIEM event forwarding
+│   │   └── webhook.go           # Generic webhook integration
 │   ├── scope/
 │   │   ├── validator.go         # Target scope validation
 │   │   └── auth.go              # Authorization tokens
@@ -187,7 +225,16 @@ auto-pentest-gpt-ai/
 │   ├── report.go
 │   ├── models.go
 │   ├── doctor.go
+│   ├── explain.go               # Explain findings in plain English
+│   ├── ctf.go                   # CTF mode commands
+│   ├── plugins.go               # Plugin management commands
 │   └── ui/                      # bubbletea TUI components
+├── playbooks/                   # Community attack playbooks (YAML)
+│   ├── aws-cloud-audit.yaml
+│   ├── oauth2-assessment.yaml
+│   ├── api-security.yaml
+│   ├── wordpress-full.yaml
+│   └── README.md                # How to write & contribute playbooks
 ├── web/                         # React dashboard
 │   ├── src/
 │   │   ├── pages/
@@ -797,7 +844,22 @@ auto-pentest-gpt-ai/
   - `pause`: args `{reason}` → transitions campaign to `Paused`, sends notification, waits for resume signal
   - `complete`: args `{summary}` → marks campaign complete, triggers report generation
 
-#### 6.3 Campaign Planner (`internal/agent/orchestrator/planner.go`)
+#### 6.3 Agent Memory System (`internal/memory/`)
+- Implement persistent cross-engagement memory that makes the tool smarter with every scan:
+  - `MemoryStore`: stores learned patterns in PostgreSQL + pgvector for semantic retrieval
+  - After every campaign completes, extract and persist:
+    - **Tech Stack Patterns**: "Rails apps on this hosting provider tend to have X misconfiguration"
+    - **Successful Attack Chains**: which exploit chains worked against which tech stacks
+    - **False Positive Patterns**: findings that were consistently noise for specific configurations
+    - **Timing Patterns**: which tools/techniques were fastest for specific target types
+  - `RecallRelevant(ctx, target, techStack) []MemoryEntry`: before starting a new campaign, query memory for relevant past insights using semantic similarity
+  - Inject recalled memories into orchestrator system prompt: "Based on previous engagements with similar targets, prioritize X and skip Y"
+  - Privacy: memory is per-installation, never leaves the machine. `autopentest memory clear` wipes everything
+  - `autopentest memory show`: displays learned patterns and stats
+  - `autopentest memory export/import`: share anonymized patterns between installations (opt-in)
+- **This is a core moat**: every scan makes the next scan better for that user. Switching to a competitor means losing accumulated intelligence.
+
+#### 6.4 Campaign Planner (`internal/agent/orchestrator/planner.go`)
 - Implement `Planner.DecomposeObjective(objective, target string) []Milestone`:
   - Milestones are ordered checkpoints the orchestrator tracks progress against
   - `"find all vulnerabilities"` → `[recon_complete, findings_classified, exploitation_attempted, report_generated]`
@@ -805,14 +867,14 @@ auto-pentest-gpt-ai/
   - `"bug bounty scan"` → `[scope_loaded, recon_complete, findings_classified, duplicates_checked, report_formatted]`
 - Implement `Planner.AssessMilestone(milestone Milestone, state CampaignState) bool`: checks whether current state satisfies milestone completion criteria
 
-#### 6.4 Campaign State Machine (`internal/pipeline/campaign.go`)
+#### 6.5 Campaign State Machine (`internal/pipeline/campaign.go`)
 - Implement `StateMachine` with explicit state transitions:
   - Each transition: validates it's allowed from current state, logs to `CampaignEvent`, updates DB
   - Transitions: `Start()`, `BeginRecon()`, `BeginClassifying()`, `BeginPlanning()`, `BeginExecuting()`, `BeginAdapting()`, `BeginReporting()`, `Complete()`, `Fail(reason)`, `Abort()`
   - `Abort()`: transitions to `Aborted`, triggers `CleanupRegistry.RunCleanup`, emits abort event to all subscribers
 - Implement `EmergencyStop(campaignID string)`: callable from API and CLI; calls `Abort()` within 5 seconds
 
-#### 6.5 Event Streaming (`internal/api/ws/hub.go`)
+#### 6.6 Event Streaming (`internal/api/ws/hub.go`)
 - Implement `EventHub`: manages WebSocket connections per campaign
   - `Subscribe(campaignID, conn)`: register a WebSocket connection
   - `Publish(campaignID, event CampaignEvent)`: broadcast event to all subscribers for that campaign
@@ -820,7 +882,7 @@ auto-pentest-gpt-ai/
 - Events streamed in real-time: orchestrator reasoning text (token by token), tool dispatch, tool result, state transitions, new findings
 - Campaign event types: `thought` (orchestrator thinking), `tool_call`, `tool_result`, `finding_discovered`, `state_change`, `step_executed`, `error`
 
-#### 6.6 Campaign API (`internal/api/handlers/campaigns.go`)
+#### 6.7 Campaign API (`internal/api/handlers/campaigns.go`)
 - `POST /api/v1/campaigns`: validate request body → create `Campaign` in DB → return campaign ID
 - `POST /api/v1/campaigns/:id/start`: verify authorization token → transition to `Initializing` → start orchestrator goroutine → return 202
 - `POST /api/v1/campaigns/:id/stop`: call `EmergencyStop` → return 200
@@ -829,7 +891,7 @@ auto-pentest-gpt-ai/
 - `GET /api/v1/campaigns/:id/findings`: return `ClassifiedFindingSet` (requires campaign in `Executing` or later state)
 - `GET /api/v1/campaigns/:id/report`: return generated report file (requires `Complete` state)
 
-#### 6.7 Tests
+#### 6.8 Tests
 - `tests/unit/orchestrator/agent_test.go`: mock all four specialist agents and LLM provider; verify ReAct loop correctly dispatches tool calls, appends to memory, terminates on objective-reached signal
 - `tests/unit/orchestrator/planner_test.go`: verify milestone decomposition for 3 different objective strings
 - `tests/unit/pipeline/state_machine_test.go`: verify all valid/invalid transitions; verify `Abort` calls cleanup
@@ -841,6 +903,9 @@ auto-pentest-gpt-ai/
 - [ ] Emergency stop transitions to `Aborted` and triggers cleanup within 5 seconds
 - [ ] WebSocket stream delivers orchestrator `thought` events in real-time (latency <500ms per token)
 - [ ] Token budget manager correctly summarizes memory when approaching 70% of context window
+- [ ] Agent memory persists patterns after campaign completion and recalls them for similar targets
+- [ ] `autopentest memory show` displays learned patterns with stats
+- [ ] `autopentest memory clear` wipes all stored patterns
 
 **Dependencies:** Sprints 1, 2, 3, 4, 5
 
@@ -989,7 +1054,21 @@ autopentest config validate                  # Validate config file
 ```
 - `config init` wizard: asks for provider choice, API key (if Claude), Ollama endpoint (if local), DB connection string; writes `config.yaml`; runs `doctor` at end to verify
 
-#### 8.8 Version & Update Commands
+#### 8.8 Explain Command (`cli/explain.go`)
+```
+autopentest explain <finding-id>           # Explain a finding in plain English
+autopentest explain <cve-id>               # Explain a CVE
+autopentest explain <finding-id> --remediate  # Include step-by-step fix instructions
+autopentest explain <finding-id> --audience developer|manager|executive
+```
+- Sends finding details to LLM with audience-appropriate prompt
+- `--audience developer`: technical explanation with code-level fix examples
+- `--audience manager`: business risk framing, compliance implications
+- `--audience executive`: one-paragraph impact statement, cost of inaction
+- This doubles the user base — defenders and dev teams use the tool too, not just pentesters
+- Output is formatted Markdown rendered beautifully in terminal via `glamour`
+
+#### 8.9 Version & Update Commands
 ```
 autopentest version             # Print version, commit hash, build date
 autopentest update              # Self-update to latest release via GitHub API
@@ -1560,7 +1639,64 @@ curl -sSL https://install.autopentest.ai/install.sh | sh
 - Test: `helm install autopentest ./deploy/helm/autopentest` deploys cleanly to a test K8s cluster
 - Publish chart to GitHub Pages Helm repository
 
-#### 15.9 GitHub Repository Polish
+#### 15.9 GitHub Action (`deploy/github-action/`)
+- Create `armur-ai/autopentest-action` — a GitHub Action for CI/CD security scanning:
+  ```yaml
+  # In any repo's .github/workflows/security.yml:
+  - uses: armur-ai/autopentest-action@v1
+    with:
+      target: ${{ env.STAGING_URL }}
+      scope: "staging.example.com"
+      provider: claude
+      api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+      fail-on: high    # Fail the PR if High/Critical findings
+      format: sarif     # GitHub Security tab integration
+  ```
+- Outputs: SARIF file (uploads to GitHub Security tab), Markdown summary (appears in PR comment), JSON findings (for downstream jobs)
+- `fail-on` flag: `critical`, `high`, `medium`, `low` — fails the GitHub check if findings at or above that severity are found
+- SARIF integration means findings appear directly in GitHub's Security tab and inline on PR diffs
+- Runs in Docker container with prebuilt image from `ghcr.io/armur-ai/autopentest`
+- This is a massive distribution vector: once one developer adds this to their CI, every PR reviewer sees the tool's output
+- Publish to GitHub Marketplace
+
+#### 15.10 `go install` Support
+- Ensure `cmd/autopentest/main.go` is the single entrypoint, so users can run:
+  ```
+  go install github.com/Armur-Ai/autopentest/cmd/autopentest@latest
+  ```
+- No CGO dependency — pure Go so cross-compilation just works
+- This is expected by every Go developer; missing it is a credibility hit
+- No public download metrics, but table-stakes for the Go ecosystem
+
+#### 15.11 Snap Store (Linux)
+- Create `deploy/snap/snapcraft.yaml`:
+  ```yaml
+  name: autopentest
+  summary: AI-powered autonomous penetration testing
+  description: |
+    Multi-agent AI system that autonomously performs full-cycle penetration tests.
+  grade: stable
+  confinement: classic  # needs network + filesystem access
+  ```
+- Build snap via GitHub Actions on every release
+- Publish to Snap Store under `armurai` publisher account
+- **Why Snap matters:** public install count visible on snapcraft.io page — trackable metric
+- `sudo snap install autopentest --classic` — reaches Ubuntu/Debian/Fedora users
+- Snap auto-updates: users stay on latest version without manual intervention
+
+#### 15.12 Windows Package Managers
+- **Winget** (`deploy/winget/`):
+  - Create manifest YAML for Windows Package Manager Community Repository
+  - Submit PR to `microsoft/winget-pkgs` on each release via GitHub Actions
+  - `winget install ArmurAI.autopentest` — reaches Windows enterprise users
+  - Install stats visible on winget.run
+- **Scoop** (`deploy/scoop/`):
+  - Create bucket JSON for Scoop
+  - Host in `armur-ai/scoop-bucket` repo
+  - `scoop bucket add armurai https://github.com/armur-ai/scoop-bucket && scoop install autopentest`
+  - Scoop is popular with Windows power users and security researchers
+
+#### 15.13 GitHub Repository Polish
 - Write root `README.md` with:
   - One-sentence description + screenshot of live watch TUI
   - Architecture diagram (Mermaid rendered as PNG)
@@ -1582,6 +1718,13 @@ curl -sSL https://install.autopentest.ai/install.sh | sh
 - [ ] `docker compose up` reaches a working dashboard state with no manual steps beyond waiting for model downloads
 - [ ] `helm install autopentest ./deploy/helm/autopentest` deploys all services to test K8s cluster
 - [ ] GitHub Release includes signed binaries for all 5 platform/arch combinations with checksum file
+- [ ] GitHub Action runs in a test repo, produces SARIF output, and findings appear in GitHub Security tab
+- [ ] GitHub Action fails the check when `fail-on: high` is set and a High severity finding is detected
+- [ ] GitHub Action posts a Markdown summary as a PR comment
+- [ ] `go install github.com/Armur-Ai/autopentest/cmd/autopentest@latest` compiles and runs
+- [ ] Snap package installs and runs on Ubuntu 22.04
+- [ ] `winget install ArmurAI.autopentest` installs on Windows 11
+- [ ] Each distribution channel has publicly visible download/install metrics
 
 **Dependencies:** Sprints 8, 9, 13
 
@@ -1613,14 +1756,29 @@ curl -sSL https://install.autopentest.ai/install.sh | sh
 - Profile memory usage during a full campaign: target peak <2GB RAM
 - Identify and fix top 3 bottlenecks found in profiling
 
-#### 16.3 Security Review
+#### 16.3 Competitor Benchmarks
+- Run autopentest, PentestGPT, CAI, and PentAGI against the same 3 vulnerable targets (WebGoat, DVWA, custom target)
+- Measure and publish comparison table:
+  | Metric | autopentest | PentestGPT | CAI | PentAGI |
+  |--------|-------------|------------|-----|---------|
+  | Findings discovered | | | | |
+  | True positive rate | | | | |
+  | Time to complete | | | | |
+  | Report quality (1-5) | | | | |
+  | Install friction (steps) | | | | |
+  | Privacy (local option) | | | | |
+- Publish as `docs/benchmarks.md` with methodology, raw data, and reproduction instructions
+- Include in README with a summary table — concrete numbers drive adoption more than feature lists
+- Update benchmarks with each major release
+
+#### 16.4 Security Review
 - Review all subprocess executions: verify scope validation is called for every one
 - Review all DB queries: verify parameterized queries everywhere, no string concatenation
 - Review API authentication: verify every endpoint requires API key except health check
 - Review file writes: verify no user-controlled input reaches file paths without sanitization
 - Fix all findings before launch
 
-#### 16.4 Launch Assets
+#### 16.5 Launch Assets
 - Record demo GIF (15 seconds): `autopentest scan --follow` showing live watch TUI — orchestrator thoughts scrolling, findings appearing, completion
 - Record demo video (3 minutes): full walkthrough from install to report download, posted to YouTube
 - Write HackerNews launch post: "Show HN: Auto-Pentest-GPT-AI — autonomous AI pentesting in Go with 4 fine-tuned specialist models"
@@ -1639,6 +1797,669 @@ curl -sSL https://install.autopentest.ai/install.sh | sh
 
 ---
 
+### Sprint 17 — Plugin System & Community Playbooks
+**Duration:** 2 weeks
+**Goal:** Build an extension system that lets the community contribute attack playbooks, custom tool integrations, and report templates — creating the nuclei-templates-style moat.
+
+**Why this sprint matters:** Nuclei has 8,000+ community templates. Metasploit has 4,000+ modules. The engine is open source, but the community's accumulated knowledge is the moat. This sprint creates the foundation for that flywheel.
+
+#### 17.1 Playbook Format (`internal/plugins/playbook.go`)
+- Define YAML playbook format:
+  ```yaml
+  # playbooks/aws-cloud-audit.yaml
+  name: AWS Cloud Security Audit
+  description: Comprehensive assessment of AWS-hosted applications
+  author: community
+  version: 1.0.0
+  tags: [aws, cloud, infrastructure]
+
+  variables:
+    target_domain:
+      type: string
+      required: true
+    aws_region:
+      type: string
+      default: us-east-1
+
+  phases:
+    - name: cloud_recon
+      tools:
+        - name: subfinder
+          options: { recursive: true }
+        - name: httpx
+          options: { followRedirects: true }
+      post_analysis: |
+        Identify any AWS-specific endpoints (S3 buckets, API Gateway,
+        CloudFront distributions, ELB endpoints). Flag any that are
+        publicly accessible without authentication.
+
+    - name: aws_specific_checks
+      tools:
+        - name: nuclei
+          options:
+            templates: ["cloud/aws/**"]
+        - name: custom_script
+          command: "python3 scripts/s3_bucket_check.py {{target_domain}}"
+      post_analysis: |
+        Classify all AWS misconfigurations by severity. Check for:
+        S3 bucket policies, IAM role exposure, metadata endpoint access.
+
+    - name: exploitation
+      conditions:
+        - findings.severity >= "high"
+      strategy: |
+        Focus on SSRF → metadata endpoint → IAM credential chains.
+        Test S3 bucket write access on any writable buckets found.
+  ```
+- Implement `PlaybookParser`: validates YAML against schema, resolves variables, expands tool references
+- Implement `PlaybookExecutor`: feeds playbook phases to orchestrator as structured objectives with tool constraints
+- Playbooks can reference other playbooks (composition): `include: common/web-basics.yaml`
+
+#### 17.2 Custom Tool Integration
+- Allow defining external tools via YAML in `~/.autopentest/plugins/tools/`:
+  ```yaml
+  # ~/.autopentest/plugins/tools/trufflehog.yaml
+  name: trufflehog
+  description: Scan for leaked secrets in git repos
+  command: trufflehog git {{target}} --json
+  output_format: jsonl
+  finding_parser:
+    type_field: "DetectorName"
+    severity: high
+    title_template: "Secret found: {{DetectorName}} in {{SourceMetadata.Data.Git.file}}"
+  scope_check: false  # trufflehog scans repos, not network targets
+  ```
+- Custom tools are available alongside native Go tools; the orchestrator can decide to use them
+- Scope validation applies unless `scope_check: false`
+
+#### 17.3 Custom Report Templates
+- Allow custom HTML/Markdown report templates in `~/.autopentest/plugins/reports/`
+- Templates use Go `text/template` syntax with the `PentestReport` struct as data context
+- Bundled templates: `default`, `executive-brief`, `compliance-focused`, `bug-bounty-submission`
+- `autopentest report <campaign-id> --template compliance-focused`
+
+#### 17.4 Community Playbook Registry (`internal/plugins/registry.go`)
+- Implement `Registry` client:
+  - `Search(query string) []PlaybookInfo`: search community playbook index
+  - `Install(name, version string) error`: download from GitHub `armur-ai/autopentest-playbooks` repo
+  - `Update() error`: update all installed community playbooks
+  - `Publish(path string) error`: validate + submit PR to community repo (authenticated via GitHub)
+- Community repo: `armur-ai/autopentest-playbooks` — structured like nuclei-templates:
+  ```
+  playbooks/
+  ├── cloud/
+  │   ├── aws-full-audit.yaml
+  │   ├── gcp-assessment.yaml
+  │   └── azure-security.yaml
+  ├── web/
+  │   ├── owasp-top10.yaml
+  │   ├── api-security.yaml
+  │   └── wordpress-full.yaml
+  ├── network/
+  │   ├── internal-pentest.yaml
+  │   └── wireless-assessment.yaml
+  └── compliance/
+      ├── pci-dss.yaml
+      ├── hipaa.yaml
+      └── soc2.yaml
+  ```
+- CLI commands:
+  ```
+  autopentest playbook search <query>       # Search community playbooks
+  autopentest playbook install <name>       # Install a playbook
+  autopentest playbook list                 # List installed playbooks
+  autopentest playbook update               # Update all playbooks
+  autopentest playbook run <name> [flags]   # Run a playbook
+  autopentest playbook create               # Scaffold a new playbook
+  autopentest playbook validate <path>      # Validate a playbook YAML
+  autopentest playbook publish <path>       # Submit to community registry
+  ```
+
+#### 17.5 Contributor Attribution & Playbook Stats
+- Every playbook YAML has an `author` field with GitHub username:
+  ```yaml
+  author:
+    name: "SecurityResearcher42"
+    github: "secresearcher42"
+  ```
+- `autopentest playbook stats <name>`: shows how many times a playbook has been used, findings discovered, average severity
+- `autopentest playbook leaderboard`: shows top contributors ranked by playbook usage across the community
+- Playbook stats are opt-in: when a playbook completes, anonymized usage data (playbook name + finding count + severity distribution) is submitted to a stats API
+- README badge: "Powered by 500+ community playbooks" — auto-updated from registry stats
+- Monthly "Top Contributor" recognition in the community repo README and Discord
+- This creates social incentive to contribute — contributors gain reputation in the security community
+
+#### 17.6 Playbook Auto-Update & Discovery
+- `autopentest playbook update` runs on a configurable schedule (default: weekly)
+- New playbook notification: "3 new playbooks available matching your scan history" — based on tech stacks you've scanned before
+- `autopentest playbook recommend <target>`: analyzes target and suggests relevant community playbooks
+- Playbook dependency resolution: if a playbook requires a custom tool plugin, auto-install it
+
+#### 17.7 Tests
+- `tests/unit/plugins/playbook_test.go`: parse valid/invalid playbooks, verify variable resolution, test phase execution order
+- `tests/unit/plugins/registry_test.go`: mock registry API, verify install/search/update
+- `tests/integration/playbook_test.go`: run `owasp-top10.yaml` playbook against WebGoat, verify findings
+
+**Acceptance Criteria:**
+- [ ] YAML playbook parses and executes correctly, producing findings equivalent to manual orchestrator campaign
+- [ ] Custom tool defined via YAML is available to the orchestrator and produces parseable findings
+- [ ] `autopentest playbook install aws-full-audit` downloads and installs from community registry
+- [ ] Playbook composition (`include:`) correctly merges phases from included playbooks
+- [ ] `autopentest playbook validate` catches malformed YAML with actionable error messages
+
+**Dependencies:** Sprints 3, 6, 8
+
+---
+
+### Sprint 18 — MCP Server Mode
+**Duration:** 1 week
+**Goal:** Expose autopentest as an MCP (Model Context Protocol) server so Claude Desktop, Cursor, Windsurf, and any MCP-compatible AI can use pentesting tools directly.
+
+**Why this sprint matters:** MCP is exploding in 2026. Every Claude Desktop and Cursor user is a potential autopentest user if they can add it with a single line in their MCP config. This is the highest-leverage distribution channel available right now — it puts the tool inside the IDE/chat interface people already live in.
+
+#### 18.1 MCP Server (`internal/mcp/server.go`)
+- Implement MCP server using the `mcp-go` SDK (or equivalent Go MCP library)
+- Server runs as: `autopentest mcp serve` (stdio mode for Claude Desktop) or `autopentest mcp serve --transport sse --port 3001` (SSE mode for web clients)
+- Register as MCP server in Claude Desktop config:
+  ```json
+  {
+    "mcpServers": {
+      "autopentest": {
+        "command": "autopentest",
+        "args": ["mcp", "serve"]
+      }
+    }
+  }
+  ```
+
+#### 18.2 MCP Tools (`internal/mcp/tools.go`)
+- Expose the following as MCP tools (callable by any connected AI):
+  - `scan_target`: start a full autonomous scan — args: `target`, `scope`, `objective`
+  - `quick_recon`: run recon only, return attack surface — args: `target`
+  - `check_vulnerability`: run nuclei with specific templates — args: `target`, `templates[]`
+  - `classify_finding`: classify a raw finding with CVE/CVSS — args: `finding_description`, `target`
+  - `explain_finding`: explain a vulnerability in plain English — args: `finding_id` or `cve_id`, `audience`
+  - `generate_report`: generate report for a campaign — args: `campaign_id`, `format`
+  - `port_scan`: run naabu port scan — args: `target`, `ports`
+  - `crawl_urls`: run katana/gau URL discovery — args: `target`, `depth`
+  - `search_findings`: semantic search across all findings — args: `query`
+  - `campaign_status`: get current status of a campaign — args: `campaign_id`
+- Every tool enforces scope validation — MCP doesn't bypass safety
+- Every tool returns structured results that the AI can reason about
+
+#### 18.3 MCP Resources (`internal/mcp/resources.go`)
+- Expose the following as MCP resources (context the AI can read):
+  - `campaign://{id}`: full campaign details with current status
+  - `findings://{campaign_id}`: all findings for a campaign
+  - `report://{campaign_id}`: generated report content
+  - `memory://patterns`: learned attack patterns from memory system
+  - `playbook://{name}`: playbook content for reference
+- Resources are read-only and respect authentication
+
+#### 18.4 MCP Prompts (`internal/mcp/prompts.go`)
+- Pre-built prompt templates exposed to connected AI:
+  - `security_assessment`: "Perform a comprehensive security assessment of {target}"
+  - `explain_for_developers`: "Explain these findings to a development team with remediation code examples"
+  - `bug_bounty_triage`: "Triage these findings for bug bounty submission — assess duplicates, impact, and report quality"
+  - `compliance_check`: "Assess these findings against {framework} compliance requirements"
+
+#### 18.5 Tests
+- `tests/unit/mcp/server_test.go`: verify MCP protocol handshake, tool listing, tool execution
+- `tests/integration/mcp_test.go`: start MCP server, connect client, call `quick_recon` tool, verify response
+
+**Acceptance Criteria:**
+- [ ] `autopentest mcp serve` starts and responds to MCP `initialize` handshake
+- [ ] All MCP tools are listed in `tools/list` response with correct JSON Schema parameters
+- [ ] `scan_target` MCP tool starts a real campaign and streams progress
+- [ ] `quick_recon` MCP tool returns structured attack surface within 5 minutes
+- [ ] Scope validation blocks out-of-scope targets even when called via MCP
+- [ ] Claude Desktop can discover and use autopentest tools after adding to MCP config
+
+**Dependencies:** Sprints 3, 6, 8
+
+---
+
+### Sprint 19 — CTF Mode
+**Duration:** 1 week
+**Goal:** Build an autonomous CTF-solving mode that can tackle HackTheBox and TryHackMe machines — the gateway drug that brings students, beginners, and content creators to the tool.
+
+**Why this sprint matters:** The professional pentester audience is ~100k people. The CTF/learning audience is 10x that. Students share tools on YouTube, Twitter, and Discord. If autopentest can solve HTB boxes, every cybersecurity YouTuber will make a video about it. That's free marketing to millions.
+
+#### 19.1 CTF Solver (`internal/ctf/solver.go`)
+- Implement `CTFSolver`:
+  - `Solve(ctx, target, platform, machineName string) (*CTFResult, error)`:
+    1. Configure orchestrator with CTF-specific objective: "Find all flags (user.txt and root.txt)"
+    2. Add CTF-specific orchestrator instructions: focus on privilege escalation chains, check common CTF patterns (SUID binaries, cron jobs, custom services)
+    3. Run standard campaign flow but with CTF-tuned prompts
+    4. On finding a flag: validate format, record it, continue to next flag
+    5. Generate a writeup automatically
+  - `CTFResult`: `Flags []Flag`, `AttackNarrative string`, `Writeup string`, `TimeElapsed time.Duration`
+  - `Flag`: `Type string` (user/root), `Value string`, `Path string`, `Method string`
+
+#### 19.2 Platform Clients (`internal/ctf/platforms.go`)
+- Implement `HTBClient` (HackTheBox API):
+  - `ListMachines(ctx) []Machine`: list available machines with difficulty/OS
+  - `SpawnMachine(ctx, machineID) (*MachineInstance, error)`: spin up a machine, get target IP
+  - `SubmitFlag(ctx, machineID, flag string) (bool, error)`: submit flag for verification
+  - `GetMachineInfo(ctx, machineID) (*MachineInfo, error)`: difficulty, OS, tags
+- Implement `THMClient` (TryHackMe API):
+  - Equivalent methods for TryHackMe rooms
+- Both clients handle authentication via API tokens configured in `config.yaml`
+
+#### 19.3 Auto-Writeup Generator (`internal/ctf/writeup.go`)
+- Implement `GenerateWriteup(ctx, campaign, flags []Flag) (string, error)`:
+  - Uses report agent (or orchestrator) to generate a step-by-step writeup
+  - Format follows standard CTF writeup structure:
+    1. Machine info (name, difficulty, OS)
+    2. Enumeration (what was found)
+    3. Initial foothold (how access was gained)
+    4. Privilege escalation (path to root)
+    5. Flags captured
+  - Output as Markdown, optionally as HTML
+- `autopentest ctf writeup <campaign-id> --publish`: generates and optionally publishes to a blog/gist
+
+#### 19.4 CLI Commands
+```
+autopentest ctf solve <target> [flags]
+  --platform htb|thm|generic    # Platform (default: generic)
+  --machine string               # Machine name (for auto-spawn)
+  --follow                       # Stream live output
+
+autopentest ctf list [flags]
+  --platform htb|thm             # List available machines
+  --difficulty easy|medium|hard  # Filter by difficulty
+  --unsolved                     # Only show unsolved machines
+
+autopentest ctf writeup <campaign-id>  # Generate writeup from completed CTF campaign
+autopentest ctf submit <campaign-id>   # Submit found flags to platform
+```
+
+#### 19.5 Tests
+- `tests/integration/ctf_test.go`: run CTF mode against a local Vulnhub-style container, verify at least one flag found
+
+**Acceptance Criteria:**
+- [ ] CTF mode finds user.txt flag on a deliberately vulnerable Docker container
+- [ ] Auto-generated writeup follows standard CTF structure with all sections populated
+- [ ] `autopentest ctf solve --platform htb --machine <name>` auto-spawns the machine, solves, and submits flags
+- [ ] CTF-specific orchestrator prompts prioritize privilege escalation patterns
+
+**Dependencies:** Sprints 6, 7, 8
+
+---
+
+### Sprint 20 — Integration Hub
+**Duration:** 1 week
+**Goal:** Deep integrations with the tools security teams already use — Jira, Slack, SIEM/SOAR platforms, and generic webhooks. Each integration raises switching cost.
+
+**Why this sprint matters:** Every integration is a hook into an existing workflow. Once autopentest is wired into a team's Jira board, their Slack channels, and their SIEM, switching to a competitor means rewiring everything. This is switching cost as moat.
+
+#### 20.1 Jira Integration (`internal/integrations/jira.go`)
+- Implement `JiraClient`:
+  - `CreateIssue(ctx, finding ClassifiedFinding, project, issueType string) (*JiraIssue, error)`:
+    - Maps finding severity to Jira priority (Critical→P1, High→P2, etc.)
+    - Title: `[autopentest] {finding.Title}`
+    - Description: finding details in Jira wiki markup with evidence, CVSS score, remediation steps
+    - Labels: `security`, `autopentest`, severity level
+    - Custom fields: CVSS score, CVE IDs (configurable field mapping)
+  - `BulkCreateIssues(ctx, findings []ClassifiedFinding, project string) ([]JiraIssue, error)`: batch creation
+  - `LinkToExisting(ctx, findingID, issueKey string) error`: link a finding to an existing Jira issue
+- Configuration: Jira URL, API token, project key, issue type, custom field mappings
+- CLI: `autopentest report <campaign-id> --jira --project SECOPS`
+
+#### 20.2 Slack Integration (`internal/integrations/slack.go`)
+- Implement `SlackClient` beyond basic webhook (Sprint 10):
+  - **Real-time campaign updates**: post to a channel when campaign starts, when critical findings discovered, when campaign completes
+  - **Interactive bot**: `/autopentest scan <target>` slash command starts a campaign from Slack
+  - **Finding alerts**: immediate Slack notification on Critical/High findings with severity badge, CVSS, and one-click link to full finding
+  - **Daily digest**: summary of all ASM changes and new findings in the last 24h
+  - **Thread-per-campaign**: each campaign gets its own thread; all updates go there to avoid noise
+- Uses Slack Bot API with Socket Mode for interactive commands
+- Configuration: Bot token, signing secret, default channel, alert threshold
+
+#### 20.3 SIEM/SOAR Integration (`internal/integrations/siem.go`)
+- Implement generic SIEM event forwarder:
+  - Outputs findings in **CEF** (Common Event Format) for ArcSight/QRadar/Splunk
+  - Outputs findings in **STIX 2.1** (Structured Threat Information Expression) for SOAR platforms
+  - Outputs findings in **SARIF** (Static Analysis Results Interchange Format) for GitHub/GitLab Security
+  - Syslog forwarding: UDP/TCP/TLS to any syslog receiver
+- Each finding becomes a structured security event with: timestamp, severity, source, target, CVE, CVSS, evidence hash
+- Configuration: SIEM type, endpoint, format, TLS cert paths
+- CLI: `autopentest report <campaign-id> --siem --format cef --endpoint syslog://splunk.internal:514`
+
+#### 20.4 Generic Webhook (`internal/integrations/webhook.go`)
+- Already defined in Sprint 10 notifications, but expand to full webhook system:
+  - Configurable events: `campaign.started`, `campaign.completed`, `finding.critical`, `finding.high`, `asm.change`, `report.generated`
+  - Webhook payload: standardized JSON with event type, timestamp, campaign context, finding details
+  - Retry with exponential backoff (3 retries, 1s/2s/4s)
+  - HMAC signature verification header for webhook consumers to validate authenticity
+  - Webhook management: `autopentest webhook add/list/remove/test`
+- This lets teams integrate with anything: PagerDuty, OpsGenie, Teams, Discord, custom dashboards
+
+#### 20.5 Tests
+- `tests/unit/integrations/jira_test.go`: mock Jira API, verify issue creation with correct field mapping
+- `tests/unit/integrations/slack_test.go`: mock Slack API, verify message formatting and thread creation
+- `tests/unit/integrations/siem_test.go`: verify CEF and STIX output format compliance
+
+**Acceptance Criteria:**
+- [ ] Jira integration creates correctly formatted issues with severity→priority mapping
+- [ ] Slack bot responds to `/autopentest scan` and posts campaign updates in a thread
+- [ ] CEF output validates against ArcSight CEF specification
+- [ ] SARIF output validates against SARIF 2.1.0 JSON schema
+- [ ] Webhook delivers events with HMAC signature and retries on failure
+
+**Dependencies:** Sprints 4, 6, 10
+
+---
+
+### Sprint 21 — Shared Intelligence Network
+**Duration:** 2 weeks
+**Goal:** Build an opt-in, anonymized intelligence sharing network where every autopentest installation contributes to and benefits from collective security knowledge. This is the deepest network effect possible — the tool gets measurably better with each new user.
+
+**Why this sprint matters:** This is the difference between a tool and a platform. Every individual scan produces intelligence. Aggregated across thousands of users, this creates a collective knowledge base no competitor can replicate without an equivalent user base. This is how you build a true data network effect.
+
+#### 21.1 Telemetry & Pattern Extraction (`internal/intelligence/extractor.go`)
+- After every campaign completes, extract anonymized patterns:
+  - **Tech Stack Patterns**: "Target runs Rails 7.x on AWS ECS" → generalized to "Rails 7.x on AWS"
+  - **Finding Patterns**: "SQL injection in search parameter" → generalized to "SQLi in search endpoints, Rails 7.x"
+  - **False Positive Patterns**: "Nuclei template X fires on Cloudflare but it's always FP" → pattern for community FP database
+  - **Attack Chain Success**: "SSRF → metadata endpoint → IAM creds worked on AWS" → chain pattern with success rate
+  - **Tool Effectiveness**: "subfinder found 95% of subdomains for .com targets, only 40% for .io targets"
+- All patterns are stripped of: target IP/domain, specific URLs, credentials, organization names, finding details
+- User sees exactly what will be shared before it's sent: `autopentest intelligence preview`
+- Patterns are hashed and deduplicated locally before sending
+
+#### 21.2 Intelligence API (`internal/intelligence/api.go`)
+- Hosted at `api.autopentest.ai` (lightweight Go service, separate repo)
+- `POST /v1/patterns`: submit anonymized patterns from a completed campaign
+- `GET /v1/patterns?tech=rails&cloud=aws`: query patterns relevant to a target's tech stack
+- `GET /v1/fp-database`: download collective false positive database
+- `GET /v1/chain-success?finding=ssrf`: get community-reported success rates for attack chains starting from a finding type
+- `GET /v1/stats`: aggregate stats (total scans, total patterns, top technologies)
+- Rate limited, API key per installation (generated on first run)
+- All data is anonymized server-side as a second pass; no raw target data is ever stored
+
+#### 21.3 Intelligence Consumer (`internal/intelligence/consumer.go`)
+- Before each campaign, query the intelligence API for relevant patterns:
+  - "For Rails apps on AWS, community reports these are the most common findings: ..."
+  - "Community false positive rate for nuclei template X on Cloudflare: 97% — consider skipping"
+  - "SSRF → cloud metadata chain has 73% success rate on AWS targets"
+- Inject these insights into the orchestrator's system prompt as prior intelligence
+- Track whether community intelligence improved scan quality (did it predict correctly?)
+- Feed accuracy data back to the intelligence API to improve pattern quality over time
+
+#### 21.4 Opt-In & Privacy Controls
+- Intelligence sharing is **OFF by default** — user must explicitly enable:
+  ```
+  autopentest config set intelligence.enabled true
+  autopentest config set intelligence.share_patterns true   # contribute patterns
+  autopentest config set intelligence.consume_patterns true  # use community patterns
+  ```
+- `autopentest intelligence preview`: shows exactly what would be shared from the last campaign
+- `autopentest intelligence opt-out`: permanently delete all submitted patterns from the API
+- `autopentest intelligence stats`: shows how community intelligence improved your scans
+- Privacy policy clearly documented: what is collected, how it's anonymized, how to delete
+- Enterprise users can run a private intelligence server within their org (self-hosted API)
+
+#### 21.5 Community Dashboard
+- Public web page at `intelligence.autopentest.ai`:
+  - Total community scans (live counter)
+  - Top vulnerability categories found across all users
+  - Technology-specific risk heatmaps: "WordPress sites have 3.2x more critical findings than Next.js sites"
+  - Attack chain success rates by tech stack
+  - Contribution leaderboard (by installation ID, anonymous unless user opts to reveal)
+- This dashboard is marketing gold — shareable stats that demonstrate the tool's value
+- Data exported as JSON API for researchers
+
+#### 21.6 Tests
+- `tests/unit/intelligence/extractor_test.go`: verify patterns are properly anonymized — no IPs, domains, or org-identifying info
+- `tests/unit/intelligence/consumer_test.go`: verify community patterns are injected into orchestrator prompt correctly
+- `tests/integration/intelligence_test.go`: full flow — extract patterns, submit to mock API, query back, verify injection
+
+**Acceptance Criteria:**
+- [ ] Pattern extractor strips ALL identifying information (IP, domain, URL, org name) — verified by regex scan of output
+- [ ] `autopentest intelligence preview` shows exactly what would be shared with no surprises
+- [ ] Community false positive database reduces FP rate by at least 20% on test targets
+- [ ] Intelligence is OFF by default and requires explicit opt-in
+- [ ] Self-hosted intelligence server works for enterprise users
+
+**Dependencies:** Sprints 4, 6, 10
+
+---
+
+### Sprint 22 — VS Code / Cursor Extension
+**Duration:** 1 week
+**Goal:** Build a VS Code / Cursor extension that brings autopentest into the IDE — the largest distribution channel in developer tooling with publicly visible install counts.
+
+**Why this sprint matters:** VS Code has 15M+ monthly active users. Cursor has millions more. The VS Code Marketplace shows public install counts — this is a highly visible metric. An extension that shows security findings inline in your code is the kind of thing developers screenshot and share. Combined with MCP server mode (Sprint 18), this creates a "security copilot" experience that no competitor offers.
+
+#### 22.1 Extension Core (`deploy/vscode/`)
+- TypeScript extension for VS Code and Cursor
+- Activates when workspace contains a `config.yaml` or `autopentest.yaml` file, or when user runs a command
+- Communicates with running autopentest API server via HTTP/WebSocket
+- Also works via MCP protocol when running in Cursor with MCP enabled
+
+#### 22.2 Extension Features
+- **Quick Scan** (`Ctrl+Shift+P` → "AutoPentest: Scan Target"):
+  - Input box for target URL/domain
+  - Scope auto-detected from project config
+  - Progress shown in VS Code notification area
+  - Findings appear in the Problems panel (like ESLint errors)
+- **Findings Panel** (custom sidebar view):
+  - Tree view of findings grouped by severity
+  - Each finding shows: title, severity badge, CVSS score, affected URL
+  - Click to expand: full description, evidence, remediation
+  - "Explain" button: calls `explain` endpoint, shows plain-English explanation in a panel
+  - "Create Jira" button: one-click issue creation (if Jira integration configured)
+- **Inline Annotations**:
+  - If findings reference specific endpoints/paths that match files in the workspace, show inline decorations
+  - Hover shows finding details with remediation guidance
+  - CodeLens: "Fix this vulnerability" links to remediation docs
+- **Campaign Status Bar**:
+  - Status bar item showing active campaign status
+  - Click to open the findings panel
+  - Animated during active scans
+- **Report Preview**:
+  - Open generated reports (HTML/Markdown) in VS Code preview panel
+  - Navigate findings from report directly to code
+
+#### 22.3 Extension Distribution
+- Publish to VS Code Marketplace: `armurai.autopentest`
+  - **Install count is publicly visible** — key growth metric
+  - Categories: "Linters", "Testing", "Other"
+  - Tags: "security", "penetration-testing", "vulnerability", "scanner"
+- Publish to Open VSX Registry (for Cursor, Codium, Theia)
+- Extension auto-updates via marketplace
+- Extension size: <5MB (just the UI, backend is the autopentest server)
+
+#### 22.4 Tests
+- `deploy/vscode/src/test/`: extension integration tests using VS Code Extension Testing API
+- Verify: command registration, findings panel rendering, status bar updates
+
+**Acceptance Criteria:**
+- [ ] Extension installs from VS Code Marketplace and activates in a workspace
+- [ ] Quick Scan command starts a campaign and findings appear in Problems panel
+- [ ] Findings panel shows tree view grouped by severity with correct badges
+- [ ] Install count is publicly visible on VS Code Marketplace page
+- [ ] Extension works in both VS Code and Cursor
+
+**Dependencies:** Sprints 6, 8, 14
+
+---
+
+### Sprint 23 — Download Metrics Dashboard & Growth Engine
+**Duration:** 1 week
+**Goal:** Build a public-facing metrics dashboard that aggregates download/install counts from every distribution channel, and automate the growth loops that drive adoption.
+
+**Why this sprint matters:** "50k weekly downloads" is the single most powerful social proof signal for an open source project. But downloads are scattered across npm, Docker Hub, GitHub Releases, Snap Store, VS Code Marketplace, and PyPI. Aggregating them into a single visible number creates a flywheel: high download count → more trust → more downloads. This also gives you real-time product-market fit signal.
+
+#### 23.1 Metrics Aggregator (`deploy/metrics/`)
+- Lightweight Go service (or serverless function) that polls download counts from all channels:
+  - **npm**: `https://api.npmjs.org/downloads/point/last-week/@armurai/autopentest`
+  - **Docker Hub**: `https://hub.docker.com/v2/repositories/armurai/autopentest/`
+  - **GitHub Releases**: GitHub API — sum of all asset download counts across releases
+  - **PyPI**: `https://pypistats.org/api/packages/autopentest-sdk/recent`
+  - **Snap Store**: snapcraft.io metrics API
+  - **VS Code Marketplace**: marketplace API install count
+  - **Homebrew**: formulae.brew.sh analytics (30-day install count)
+  - **GitHub Action**: marketplace install count
+  - **Winget**: winget.run stats
+- Stores daily snapshots in a simple JSON file or SQLite database
+- Exposes API: `GET /api/metrics` → aggregated counts + per-channel breakdown
+
+#### 23.2 Public Dashboard (`metrics.autopentest.ai`)
+- Single-page site showing:
+  - **Total downloads** (big number, all channels combined)
+  - **Weekly downloads** (trend graph, last 12 weeks)
+  - **Per-channel breakdown** (bar chart: npm, Docker, GitHub, Snap, VS Code, PyPI, Homebrew)
+  - **Growth rate** (week-over-week percentage)
+  - **GitHub stars** graph (via GitHub API)
+  - **Community stats**: playbook count, intelligence network participants, contributor count
+- Hosted on Cloudflare Pages or Vercel (free tier)
+- Updates daily via cron job or GitHub Actions scheduled workflow
+
+#### 23.3 README Badges
+- Dynamic badges in README.md that show real-time stats:
+  ```markdown
+  ![Downloads](https://img.shields.io/endpoint?url=https://metrics.autopentest.ai/api/badge/total)
+  ![Weekly](https://img.shields.io/endpoint?url=https://metrics.autopentest.ai/api/badge/weekly)
+  ![Docker Pulls](https://img.shields.io/docker/pulls/armurai/autopentest)
+  ![npm](https://img.shields.io/npm/dw/@armurai/autopentest)
+  ![VS Code](https://img.shields.io/visual-studio-marketplace/i/armurai.autopentest)
+  ![GitHub Stars](https://img.shields.io/github/stars/Armur-Ai/autopentest)
+  ```
+- Custom badge endpoint at `metrics.autopentest.ai/api/badge/{metric}` returns shields.io-compatible JSON
+- Badges update daily — always showing fresh numbers
+
+#### 23.4 Growth Automation
+- **GitHub Stars reminder**: after a successful scan, CLI prints: "If autopentest saved you time, consider starring us on GitHub: https://github.com/Armur-Ai/autopentest" (once per installation, dismissable)
+- **Changelog notifications**: `autopentest` checks for new versions on startup (weekly, not every run); if update available, prints one-line notice with what's new
+- **Social sharing**: `autopentest share <campaign-id>` generates a shareable summary image (findings count, severity distribution, tech stack) with autopentest branding — designed for Twitter/LinkedIn
+- **Referral tracking**: install script and npm shim accept `?ref=` parameter so you can track which blog posts/talks/videos drive installs
+- **Weekly digest email** (opt-in): for users who register, weekly email with: your scan stats, new community playbooks, new features, community highlights
+
+#### 23.5 SEO & Discovery
+- Ensure the following pages exist and are indexed:
+  - `autopentest.ai` — landing page with install instructions, demo GIF, feature list
+  - `docs.autopentest.ai` — documentation site (GitHub Pages or Docusaurus)
+  - `metrics.autopentest.ai` — public download dashboard
+  - `intelligence.autopentest.ai` — community intelligence dashboard
+- All pages have proper OpenGraph tags for social sharing
+- Submit to: awesome-go, awesome-security, awesome-hacking, awesome-pentest lists on GitHub
+- Write guest posts for: The New Stack, Help Net Security, InfoSec Write-ups, DEV Community
+
+**Acceptance Criteria:**
+- [ ] Metrics API returns aggregated download count from at least 5 channels
+- [ ] Public dashboard shows total downloads, weekly trend, and per-channel breakdown
+- [ ] README badges show real-time download counts that update daily
+- [ ] `autopentest share` generates a shareable image with scan summary
+- [ ] Landing page at autopentest.ai loads with install instructions and demo GIF
+
+**Dependencies:** Sprints 14, 15
+
+---
+
+## Moat Strategy
+
+### The Network Effects Flywheel
+
+The core insight: **the moat is not the product, it's the ecosystem around it**. The product is open source and forkable. The community, the shared intelligence, the playbooks, and the integrations are not.
+
+```
+                    ┌──────────────────┐
+                    │   New User       │
+                    │   Installs tool  │
+                    └────────┬─────────┘
+                             │
+                    ┌────────▼─────────┐
+                    │   Runs scans     │
+                    └────────┬─────────┘
+                             │
+              ┌──────────────┼──────────────┐
+              │              │              │
+    ┌─────────▼──────┐ ┌────▼──────┐ ┌────▼───────────┐
+    │ Contributes    │ │ Shares    │ │ Integrates     │
+    │ playbooks      │ │ anonymized│ │ into workflow   │
+    │ + templates    │ │ patterns  │ │ (Jira/Slack/CI)│
+    └─────────┬──────┘ └────┬──────┘ └────┬───────────┘
+              │              │              │
+    ┌─────────▼──────────────▼──────────────▼───────────┐
+    │          Platform gets better for EVERYONE          │
+    │  More playbooks · Smarter AI · More integrations   │
+    └─────────────────────────┬─────────────────────────┘
+                              │
+                    ┌─────────▼─────────┐
+                    │  Attracts more    │
+                    │  users            │
+                    └───────────────────┘
+```
+
+### Four Layers of Defensibility
+
+**Layer 1 — Community Playbooks (Direct Network Effect)**
+
+Like nuclei-templates but for full multi-step AI-powered attack chains. Every contributed playbook makes the platform more valuable for every user. A competitor can fork the engine but cannot fork the community.
+
+- Separate repo: `armur-ai/autopentest-playbooks` — the nuclei-templates of AI pentesting
+- Contributor attribution + leaderboard (social incentive)
+- Playbook stats: usage count, findings discovered, community rating
+- Auto-update mechanism pulls new playbooks weekly
+- Target: 100 at launch, 500+ at month 6, 2000+ at year 1
+- Categories: cloud (AWS/GCP/Azure), web (OWASP/CMS/API), network, compliance (PCI/HIPAA/SOC2), industry-specific
+
+**Layer 2 — Shared Intelligence Network (Data Network Effect)**
+
+The deepest moat. Every scan teaches the system something. Aggregated across thousands of users (opt-in, anonymized), this creates collective intelligence no competitor can replicate without an equivalent user base:
+
+- Collective false positive database: "Nuclei template X on Cloudflare = 97% FP"
+- Tech-stack risk profiles: "WordPress sites have 3.2x more critical findings than Next.js"
+- Attack chain success rates: "SSRF → metadata on AWS = 73% success rate"
+- Tool effectiveness data: "subfinder covers 95% of .com but only 40% of .io"
+- The intelligence API feeds directly into agent prompts, making the AI measurably smarter
+
+```
+More users → More scans → Better intelligence → Better results → More users
+                                    ↓
+                          Anonymized patterns (opt-in)
+                                    ↓
+                          Fine-tuned models v2, v3, v4...
+                                    ↓
+                          Better out-of-box performance → More users
+```
+
+**Layer 3 — Integration Hub (Switching Cost)**
+
+Every integration is a hook into an existing workflow. Each one raises the cost of switching to a competitor:
+
+- **Developer workflow**: VS Code extension, Cursor MCP, GitHub Action (CI/CD)
+- **Security operations**: Jira, Slack bot, SIEM (CEF/STIX/SARIF), PagerDuty webhook
+- **Bug bounty**: HackerOne scope import + submission, Bugcrowd integration
+- **Infrastructure**: Docker, Kubernetes Helm chart, Terraform provider (future)
+- Once wired in, ripping out autopentest means rewiring every connected system
+
+**Layer 4 — Distribution Surface (Visibility Moat)**
+
+Being available everywhere creates an awareness advantage. Public download metrics on every channel create social proof that compounds:
+
+- **npm**: weekly download count on npmjs.com (the most visible metric in open source)
+- **Docker Hub**: pull count on Docker Hub page
+- **VS Code Marketplace**: install count (reaches non-security developers)
+- **Snap Store**: install count on snapcraft.io
+- **PyPI**: download stats on pypistats.org
+- **GitHub**: stars, forks, contributor count
+- **Aggregated dashboard**: `metrics.autopentest.ai` shows total downloads across all channels
+- High download numbers → more trust → more downloads (self-reinforcing)
+
+### Why Fine-Tuned Models Are Layer 2, Not Layer 1
+
+Fine-tuned models on synthetic data are a starting point, not a moat. The moat comes when those models are trained on real-world data from the shared intelligence network — data that no competitor has access to without an equivalent user base. The roadmap:
+
+1. **v1.0**: Ship with prompted models (Claude API / Ollama). Works immediately, no cold-start.
+2. **v1.x**: Collect real-world patterns via agent memory + shared intelligence network (with user consent).
+3. **v2.0**: Fine-tune models on anonymized real-world patterns. Now the models are genuinely better than anything a competitor can build by just calling Claude.
+4. **v3.0+**: Data flywheel is spinning — each release improves models, which improves results, which attracts more users, which produces more data.
+
+---
+
 ## Success Metrics
 
 | Metric | Target |
@@ -1652,15 +2473,45 @@ curl -sSL https://install.autopentest.ai/install.sh | sh
 | Recon model JSON validity | >95% |
 | Exploit model plan validity | >85% |
 | `docker compose up` to working dashboard | <15 min (model download included) |
+| Community playbooks (month 3) | 100+ |
+| Community playbooks (month 6) | 500+ |
+| Community playbooks (year 1) | 2,000+ |
+| MCP tool calls per week (month 3) | 10,000+ |
+| GitHub Action installs (month 6) | 500+ repos |
+| CTF machines solved autonomously | >50% of Easy HTB |
+| **Distribution Metrics** | |
+| npm weekly downloads (month 3) | 5,000+ |
+| npm weekly downloads (month 6) | 20,000+ |
+| Docker Hub pulls (month 6) | 100,000+ |
+| VS Code extension installs (month 6) | 10,000+ |
+| Total downloads all channels (month 6) | 500,000+ |
+| **Network Effect Metrics** | |
+| Shared intelligence network participants | 1,000+ (month 6) |
+| Community FP database entries | 5,000+ (month 6) |
+| Playbook contributors | 100+ (month 6) |
+| Integration plugin count | 30+ (month 6) |
 
 ---
 
 ## What Makes This Defensible
 
-1. **Four proprietary fine-tuned models** — the data flywheel improves them with every release; cannot be replicated by forking the repo
-2. **Go-native single binary** — `brew install` in one command; no Python runtime, no pip hell
-3. **Native Go security tool integration** — subfinder/httpx/nuclei/naabu as libraries, not subprocesses
-4. **Continuous ASM** — the only open-source tool that autonomously watches your attack surface and triggers AI tests on changes
-5. **Bug bounty workflow** — reads H1/Bugcrowd scope, deduplicates, formats reports correctly; nobody else does this
-6. **Full privacy option** — 100% local with Ollama, nothing leaves your machine
-7. **Multi-agent architecture** — each model is narrow and deep; the right base model per task (Qwen/Mistral/DeepSeek R1/Llama)
+**Four-Layer Moat** (see Moat Strategy section above for full detail):
+
+1. **Community Playbooks (Network Effect)** — nuclei-templates equivalent for AI attack chains; 2,000+ target year 1; can't be replicated by forking the engine
+2. **Shared Intelligence Network (Data Network Effect)** — collective FP database, tech-stack risk profiles, attack chain success rates; the tool gets measurably better with each new user
+3. **Integration Hub (Switching Cost)** — Jira + Slack + SIEM + GitHub Action + MCP + VS Code + CI/CD; ripping out autopentest means rewiring every connected system
+4. **Distribution Surface (Visibility Moat)** — npm + Docker + Snap + VS Code Marketplace + PyPI + Homebrew + Winget; public download metrics on every channel create compounding social proof
+
+**Technical Differentiators:**
+
+5. **Go-native single binary** — `brew install` in one command; no Python runtime, no pip hell
+6. **Native Go security tool integration** — subfinder/httpx/nuclei/naabu as libraries, not subprocesses
+7. **MCP Server** — usable from Claude Desktop, Cursor, and any MCP-compatible AI; the only pentesting MCP server
+8. **VS Code/Cursor Extension** — security findings inline in your IDE; the largest distribution channel in developer tooling
+9. **Continuous ASM** — the only open-source tool that autonomously watches your attack surface and triggers AI tests on changes
+10. **Bug bounty workflow** — reads H1/Bugcrowd scope, deduplicates, formats reports correctly; nobody else does this
+11. **CTF Mode** — autonomous CTF solving drives 10x larger student/beginner audience
+12. **Full privacy option** — 100% local with Ollama, nothing leaves your machine
+13. **GitHub Action** — security scanning in CI/CD with SARIF integration; findings appear in GitHub Security tab
+14. **Multi-agent architecture** — specialist models per task, coordinated by ReAct orchestrator
+15. **Public metrics dashboard** — aggregated download counts across all channels; social proof that compounds
