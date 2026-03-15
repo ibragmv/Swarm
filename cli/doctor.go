@@ -16,7 +16,8 @@ var doctorCmd = &cobra.Command{
 	Long:  "Runs a 10-point health check to verify all dependencies are available.",
 	Example: "  autopentest doctor",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("🔍 autopentest doctor — checking system health\n")
+		fmt.Println("🔍 autopentest doctor — checking system health")
+		fmt.Println()
 
 		checks := []struct {
 			name  string
