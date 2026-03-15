@@ -1,0 +1,92 @@
+package recon
+
+import (
+	"encoding/json"
+	"fmt"
+	"strings"
+
+	"github.com/Armur-Ai/autopentest/internal/pipeline"
+	"github.com/Armur-Ai/autopentest/internal/tools"
+)
+
+// ParseAttackSurface parses an LLM response into a structured AttackSurface.
+func ParseAttackSurface(rawJSON string) (*pipeline.AttackSurface, error) {
+	// Strip markdown code fences if present
+	rawJSON = stripCodeFence(rawJSON)
+	rawJSON = strings.TrimSpace(rawJSON)
+
+	if rawJSON == "" {
+		return nil, fmt.Errorf("empty response from LLM")
+	}
+
+	var surface pipeline.AttackSurface
+	if err := json.Unmarshal([]byte(rawJSON), &surface); err != nil {
+		return nil, fmt.Errorf("parsing attack surface JSON: %w (raw: %.200s)", err, rawJSON)
+	}
+
+	return &surface, nil
+}
+
+// MergeToolResults deduplicates and enriches findings from multiple tools.
+func MergeToolResults(results []*tools.ToolResult) MergedData {
+	merged := MergedData{
+		Subdomains: make(map[string]bool),
+		Hosts:      make(map[string]bool),
+		Endpoints:  make(map[string]bool),
+	}
+
+	for _, r := range results {
+		if r.Error != nil {
+			continue
+		}
+
+		for _, finding := range r.ParsedFindings {
+			if subdomain, ok := finding["subdomain"].(string); ok {
+				merged.Subdomains[subdomain] = true
+			}
+			if host, ok := finding["host"].(string); ok {
+				merged.Hosts[host] = true
+			}
+			if url, ok := finding["url"].(string); ok {
+				merged.Endpoints[url] = true
+			}
+		}
+	}
+
+	return merged
+}
+
+// MergedData holds deduplicated data from multiple tool results.
+type MergedData struct {
+	Subdomains map[string]bool
+	Hosts      map[string]bool
+	Endpoints  map[string]bool
+}
+
+// UniqueSubdomains returns the deduplicated subdomain list.
+func (m MergedData) UniqueSubdomains() []string {
+	result := make([]string, 0, len(m.Subdomains))
+	for s := range m.Subdomains {
+		result = append(result, s)
+	}
+	return result
+}
+
+// stripCodeFence removes markdown ```json ... ``` wrappers.
+func stripCodeFence(s string) string {
+	s = strings.TrimSpace(s)
+
+	// Remove ```json prefix
+	if strings.HasPrefix(s, "```json") {
+		s = s[7:]
+	} else if strings.HasPrefix(s, "```") {
+		s = s[3:]
+	}
+
+	// Remove ``` suffix
+	if strings.HasSuffix(s, "```") {
+		s = s[:len(s)-3]
+	}
+
+	return strings.TrimSpace(s)
+}
