@@ -65,7 +65,9 @@ type OrchestratorConfig struct {
 }
 
 type AgentModelConfig struct {
+	Provider string `mapstructure:"provider"` // claude, ollama, lmstudio — empty means inherit from orchestrator
 	Model    string `mapstructure:"model"`
+	APIKey   string `mapstructure:"api_key"` // empty means inherit from orchestrator
 	Endpoint string `mapstructure:"endpoint"`
 }
 
@@ -184,14 +186,16 @@ func Load(path string) (*Config, error) {
 	v.SetDefault("orchestrator.context_window", 200000)
 	v.SetDefault("orchestrator.max_tokens", 8192)
 	v.SetDefault("orchestrator.temperature", 0.1)
-	v.SetDefault("agents.recon.model", "ArmurAI/recon-agent-qwen2.5-7b")
-	v.SetDefault("agents.recon.endpoint", "http://localhost:11434")
-	v.SetDefault("agents.classifier.model", "ArmurAI/classifier-agent-mistral-7b")
-	v.SetDefault("agents.classifier.endpoint", "http://localhost:11434")
-	v.SetDefault("agents.exploit.model", "ArmurAI/exploit-agent-deepseek-r1-8b")
-	v.SetDefault("agents.exploit.endpoint", "http://localhost:11434")
-	v.SetDefault("agents.report.model", "ArmurAI/report-agent-llama3.1-8b")
-	v.SetDefault("agents.report.endpoint", "http://localhost:11434")
+	// Agent defaults: empty provider/api_key = inherit from orchestrator.
+	// This means with just a Claude API key, ALL agents use Claude — no Ollama needed.
+	v.SetDefault("agents.recon.provider", "")
+	v.SetDefault("agents.recon.model", "")
+	v.SetDefault("agents.classifier.provider", "")
+	v.SetDefault("agents.classifier.model", "")
+	v.SetDefault("agents.exploit.provider", "")
+	v.SetDefault("agents.exploit.model", "")
+	v.SetDefault("agents.report.provider", "")
+	v.SetDefault("agents.report.model", "")
 	v.SetDefault("tools.default_timeout", 300)
 	v.SetDefault("tools.subfinder.recursive", false)
 	v.SetDefault("tools.subfinder.timeout", 300)

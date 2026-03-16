@@ -9,56 +9,77 @@ import (
 
 // NewProvider creates the appropriate LLM provider based on configuration.
 func NewProvider(cfg config.OrchestratorConfig) (Provider, error) {
-	switch cfg.Provider {
+	return newProviderFromParams(cfg.Provider, cfg.APIKey, cfg.Model, cfg.Endpoint, cfg.ContextWindow)
+}
+
+// NewAgentProvider creates an LLM provider for a specialist agent.
+// If the agent has no provider configured, it inherits from the orchestrator.
+// This means with just a Claude API key, ALL agents use Claude — zero Ollama needed.
+func NewAgentProvider(agentCfg config.AgentModelConfig, orchestratorCfg config.OrchestratorConfig) (Provider, error) {
+	// Inherit from orchestrator if agent provider is not set
+	provider := agentCfg.Provider
+	if provider == "" {
+		provider = orchestratorCfg.Provider
+	}
+
+	apiKey := agentCfg.APIKey
+	if apiKey == "" {
+		apiKey = orchestratorCfg.APIKey
+	}
+
+	model := agentCfg.Model
+	if model == "" {
+		model = orchestratorCfg.Model
+	}
+
+	endpoint := agentCfg.Endpoint
+	if endpoint == "" {
+		endpoint = orchestratorCfg.Endpoint
+	}
+
+	contextWindow := orchestratorCfg.ContextWindow
+	if contextWindow <= 0 {
+		contextWindow = 200000
+	}
+
+	return newProviderFromParams(provider, apiKey, model, endpoint, contextWindow)
+}
+
+func newProviderFromParams(provider, apiKey, model, endpoint string, contextWindow int) (Provider, error) {
+	switch provider {
 	case "claude":
-		if cfg.APIKey == "" {
-			return nil, fmt.Errorf("claude provider requires api_key to be set")
+		if apiKey == "" {
+			return nil, fmt.Errorf("claude provider requires api_key — set AUTOPENTEST_ORCHESTRATOR_API_KEY or orchestrator.api_key in config.yaml")
 		}
 		return NewClaudeProvider(ClaudeProviderConfig{
-			APIKey:        cfg.APIKey,
-			Model:         cfg.Model,
-			ContextWindow: cfg.ContextWindow,
+			APIKey:        apiKey,
+			Model:         model,
+			ContextWindow: contextWindow,
 		}), nil
 
 	case "ollama":
-		endpoint := cfg.Endpoint
 		if endpoint == "" {
 			endpoint = "http://localhost:11434"
 		}
 		return NewOllamaProvider(OllamaProviderConfig{
 			Endpoint:      endpoint,
-			Model:         cfg.Model,
-			ContextWindow: cfg.ContextWindow,
+			Model:         model,
+			ContextWindow: contextWindow,
 		}), nil
 
 	case "lmstudio":
-		endpoint := cfg.Endpoint
 		if endpoint == "" {
 			endpoint = "http://localhost:1234"
 		}
 		return NewLMStudioProvider(LMStudioProviderConfig{
 			Endpoint:      endpoint,
-			Model:         cfg.Model,
-			ContextWindow: cfg.ContextWindow,
+			Model:         model,
+			ContextWindow: contextWindow,
 		}), nil
 
 	default:
-		return nil, fmt.Errorf("unknown provider %q — use claude, ollama, or lmstudio", cfg.Provider)
+		return nil, fmt.Errorf("unknown provider %q — use claude, ollama, or lmstudio", provider)
 	}
-}
-
-// NewAgentProvider creates an LLM provider for a specialist agent.
-// Agents always use Ollama for local model inference.
-func NewAgentProvider(cfg config.AgentModelConfig) Provider {
-	endpoint := cfg.Endpoint
-	if endpoint == "" {
-		endpoint = "http://localhost:11434"
-	}
-	return NewOllamaProvider(OllamaProviderConfig{
-		Endpoint:      endpoint,
-		Model:         cfg.Model,
-		ContextWindow: 32000,
-	})
 }
 
 // ValidateProvider verifies a provider is reachable and meets minimum requirements.

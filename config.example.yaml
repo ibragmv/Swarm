@@ -35,20 +35,27 @@ orchestrator:
   temperature: 0.1         # Lower = more deterministic
 
 # --- Specialist Agent Models ---
-# These run via Ollama by default. Pull with: autopentest models pull
+# By default, ALL agents inherit the orchestrator's provider and API key.
+# This means with just a Claude API key above, everything works — no Ollama needed.
+#
+# To use local fine-tuned models instead (v2.0), uncomment and configure:
 agents:
   recon:
-    model: "ArmurAI/recon-agent-qwen2.5-7b"
-    endpoint: "http://localhost:11434"
+    provider: ""               # empty = inherit from orchestrator (Claude)
+    model: ""                  # empty = use orchestrator's model
+    # To use fine-tuned local model instead:
+    # provider: "ollama"
+    # model: "ArmurAI/recon-agent-qwen2.5-7b"
+    # endpoint: "http://localhost:11434"
   classifier:
-    model: "ArmurAI/classifier-agent-mistral-7b"
-    endpoint: "http://localhost:11434"
+    provider: ""
+    model: ""
   exploit:
-    model: "ArmurAI/exploit-agent-deepseek-r1-8b"
-    endpoint: "http://localhost:11434"
+    provider: ""
+    model: ""
   report:
-    model: "ArmurAI/report-agent-llama3.1-8b"
-    endpoint: "http://localhost:11434"
+    provider: ""
+    model: ""
 
 # --- Security Tool Settings ---
 tools:
