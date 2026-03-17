@@ -1,6 +1,10 @@
 > **Legal Disclaimer:** Pentest Swarm AI is designed exclusively for **authorized security testing**, **bug bounty programs**, **CTF competitions**, and **educational research**. You must obtain explicit written permission from the target system owner before running any scan. Unauthorized access to computer systems is illegal under the Computer Fraud and Abuse Act (CFAA), the Computer Misuse Act, and equivalent laws worldwide. The authors and contributors of this project accept **no liability** for misuse, damage, or any illegal activity conducted with this tool. By using this software, you agree that you are solely responsible for ensuring your use complies with all applicable laws and regulations. **Do not use this tool against systems you do not own or have explicit authorization to test.**
 
 <p align="center">
+  <img src="banner/pentest_swarm_ai_banner.svg" alt="Pentest Swarm AI" width="800">
+</p>
+
+<p align="center">
   <h1 align="center">Pentest Swarm AI</h1>
   <p align="center">
     <strong>Unleash a swarm of AI agents to autonomously pentest your software</strong>
