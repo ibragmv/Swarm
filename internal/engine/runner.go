@@ -1,0 +1,395 @@
+package engine
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/agent/classifier"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/agent/exploit"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/agent/recon"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/agent/report"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/config"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/llm"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/memory"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/pipeline"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/scope"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/tools"
+	"github.com/google/uuid"
+)
+
+// CampaignConfig holds everything needed to run a campaign.
+type CampaignConfig struct {
+	Target    string
+	Scope     []string // domains and/or CIDRs
+	Objective string
+	Mode      string
+	DryRun    bool
+	OutputDir string
+	Format    string
+	Provider  string // override config provider
+	APIKey    string // override config API key
+}
+
+// EventCallback is called for every campaign event (for TUI/streaming).
+type EventCallback func(event pipeline.CampaignEvent)
+
+// Runner executes a full campaign pipeline.
+type Runner struct {
+	cfg         *config.Config
+	memoryStore *memory.MemoryStore
+}
+
+// NewRunner creates a campaign runner.
+func NewRunner(cfg *config.Config) *Runner {
+	return &Runner{
+		cfg:         cfg,
+		memoryStore: memory.NewMemoryStore(),
+	}
+}
+
+// Run executes a complete penetration test campaign.
+func (r *Runner) Run(ctx context.Context, cc CampaignConfig, onEvent EventCallback) error {
+	start := time.Now()
+	campaignID := uuid.New()
+
+	// Build scope definition
+	scopeDef, err := buildScope(cc.Scope)
+	if err != nil {
+		return fmt.Errorf("invalid scope: %w", err)
+	}
+
+	// Create campaign
+	campaign := pipeline.Campaign{
+		ID:        campaignID,
+		Name:      fmt.Sprintf("scan-%s-%s", cc.Target, time.Now().Format("20060102-150405")),
+		Target:    cc.Target,
+		Objective: cc.Objective,
+		Status:    pipeline.StatusPlanned,
+		Mode:      pipeline.CampaignMode(cc.Mode),
+		Scope: pipeline.ScopeDefinition{
+			AllowedDomains: scopeDef.AllowedDomains,
+			AllowedCIDRs:   scopeDef.AllowedCIDRs,
+		},
+		CreatedAt: time.Now(),
+	}
+
+	emit := func(eventType pipeline.EventType, agent, detail string) {
+		if onEvent != nil {
+			onEvent(pipeline.CampaignEvent{
+				ID:         uuid.New(),
+				CampaignID: campaignID,
+				Timestamp:  time.Now(),
+				EventType:  eventType,
+				AgentName:  agent,
+				Detail:     detail,
+			})
+		}
+	}
+
+	// State machine
+	sm := pipeline.NewStateMachine(&campaign, func(e pipeline.CampaignEvent) {
+		if onEvent != nil {
+			onEvent(e)
+		}
+	})
+
+	// Initialize LLM provider
+	orchestratorCfg := r.cfg.Orchestrator
+	if cc.Provider != "" {
+		orchestratorCfg.Provider = cc.Provider
+	}
+	if cc.APIKey != "" {
+		orchestratorCfg.APIKey = cc.APIKey
+	}
+
+	provider, err := llm.NewProvider(orchestratorCfg)
+	if err != nil {
+		return fmt.Errorf("failed to create LLM provider: %w", err)
+	}
+
+	emit(pipeline.EventStateChange, "engine", "Campaign initialized")
+
+	// --- Phase 1: RECON ---
+	if err := sm.Start(); err != nil {
+		return err
+	}
+	if err := sm.BeginRecon(); err != nil {
+		return err
+	}
+
+	emit(pipeline.EventThought, "orchestrator", fmt.Sprintf("Starting reconnaissance on %s", cc.Target))
+
+	coordinator := tools.NewCoordinator()
+	reconAgent := recon.NewReconAgent(provider, coordinator)
+	reconPlan := reconAgent.PlanRecon(cc.Target)
+
+	emit(pipeline.EventToolCall, "recon", fmt.Sprintf("Running tools: %s", strings.Join(reconPlan.ToolOrder, ", ")))
+
+	surface, err := reconAgent.Execute(ctx, reconPlan, &scope.ScopeDefinition{
+		AllowedDomains: scopeDef.AllowedDomains,
+		AllowedCIDRs:   scopeDef.AllowedCIDRs,
+	}, campaignID)
+	if err != nil {
+		emit(pipeline.EventError, "recon", fmt.Sprintf("Recon failed: %s", err))
+		sm.Fail("recon failed")
+		return fmt.Errorf("recon failed: %w", err)
+	}
+
+	emit(pipeline.EventToolResult, "recon", fmt.Sprintf("Found %d subdomains, %d hosts, %d endpoints",
+		len(surface.Subdomains), len(surface.Hosts), len(surface.Endpoints)))
+
+	// --- Phase 2: CLASSIFY ---
+	if err := sm.BeginClassifying(); err != nil {
+		return err
+	}
+
+	emit(pipeline.EventThought, "orchestrator", "Classifying findings — mapping CVEs, scoring CVSS, filtering false positives")
+
+	classifierAgent := classifier.NewClassifierAgent(provider)
+
+	// Build raw findings from attack surface
+	rawFindings := extractRawFindings(surface, campaignID)
+
+	emit(pipeline.EventToolCall, "classifier", fmt.Sprintf("Classifying %d raw findings", len(rawFindings)))
+
+	findingSet, err := classifierAgent.Classify(ctx, campaignID, rawFindings)
+	if err != nil {
+		emit(pipeline.EventError, "classifier", fmt.Sprintf("Classification failed: %s", err))
+		sm.Fail("classification failed")
+		return fmt.Errorf("classification failed: %w", err)
+	}
+
+	for _, f := range findingSet.Findings {
+		emit(pipeline.EventFindingDiscovered, "classifier",
+			fmt.Sprintf("[%s] %s (CVSS: %.1f) on %s", strings.ToUpper(string(f.Severity)), f.Title, f.CVSSScore, f.Target))
+	}
+
+	emit(pipeline.EventToolResult, "classifier", fmt.Sprintf("Classified %d findings (%d filtered as FP). Severity: %d critical, %d high, %d medium",
+		findingSet.Summary.TotalFindings, findingSet.Summary.FilteredAsFP,
+		findingSet.Summary.BySeverity[pipeline.SeverityCritical],
+		findingSet.Summary.BySeverity[pipeline.SeverityHigh],
+		findingSet.Summary.BySeverity[pipeline.SeverityMedium]))
+
+	// --- Phase 3: PLAN ---
+	if err := sm.BeginPlanning(); err != nil {
+		return err
+	}
+
+	emit(pipeline.EventThought, "orchestrator", "Building attack plan — constructing exploitation chains")
+
+	exploitAgent := exploit.NewExploitAgent(provider)
+
+	var attackPlan *pipeline.AttackPlan
+	if !cc.DryRun && len(findingSet.Findings) > 0 {
+		attackPlan, err = exploitAgent.BuildPlan(ctx, *findingSet, cc.Objective)
+		if err != nil {
+			emit(pipeline.EventError, "exploit", fmt.Sprintf("Plan construction failed: %s", err))
+		} else {
+			emit(pipeline.EventToolResult, "exploit", fmt.Sprintf("Built %d attack paths. Top path: %s (%.0f%% estimated success)",
+				len(attackPlan.Paths),
+				pathName(attackPlan),
+				pathProb(attackPlan)*100))
+		}
+	}
+
+	// --- Phase 4: EXECUTE (if not dry-run) ---
+	var execResults []pipeline.ExecutionResult
+	if !cc.DryRun && attackPlan != nil && len(attackPlan.Paths) > 0 {
+		if err := sm.BeginExecuting(); err != nil {
+			return err
+		}
+
+		emit(pipeline.EventThought, "orchestrator", "Executing top attack paths")
+
+		executor := exploit.NewExecutor(
+			&scope.ScopeDefinition{AllowedDomains: scopeDef.AllowedDomains, AllowedCIDRs: scopeDef.AllowedCIDRs},
+			nil, // cleanup registry (needs DB)
+			cc.DryRun,
+		)
+
+		for _, path := range attackPlan.Paths[:min(3, len(attackPlan.Paths))] {
+			for _, step := range path.Steps {
+				if step.Command == "" {
+					continue
+				}
+				emit(pipeline.EventStepExecuted, "exploit", fmt.Sprintf("Executing: %s", step.Name))
+
+				result, err := executor.Execute(ctx, step, campaignID)
+				if err != nil {
+					emit(pipeline.EventError, "exploit", fmt.Sprintf("Step failed: %s", err))
+					continue
+				}
+				execResults = append(execResults, *result)
+
+				if result.Success {
+					emit(pipeline.EventToolResult, "exploit", fmt.Sprintf("Step succeeded: %s", step.Name))
+				} else {
+					emit(pipeline.EventToolResult, "exploit", fmt.Sprintf("Step failed: %s", step.Name))
+				}
+			}
+		}
+	}
+
+	// --- Phase 5: REPORT ---
+	if err := sm.BeginReporting(); err != nil {
+		return err
+	}
+
+	emit(pipeline.EventThought, "orchestrator", "Generating penetration test report")
+
+	reportAgent := report.NewReportAgent(provider)
+	pentestReport, err := reportAgent.Generate(ctx, campaign, findingSet.Findings, attackPlan, execResults)
+	if err != nil {
+		emit(pipeline.EventError, "report", fmt.Sprintf("Report generation failed: %s", err))
+		sm.Fail("report generation failed")
+		return fmt.Errorf("report generation failed: %w", err)
+	}
+
+	// Render and save report
+	renderer := report.NewRenderer()
+	outputDir := cc.OutputDir
+	if outputDir == "" {
+		outputDir = "./reports"
+	}
+	os.MkdirAll(outputDir, 0755)
+
+	reportPath := filepath.Join(outputDir, fmt.Sprintf("%s-%s", campaign.Name, campaignID.String()[:8]))
+
+	if cc.Format == "all" || cc.Format == "md" || cc.Format == "" {
+		md, _ := renderer.ToMarkdown(pentestReport)
+		os.WriteFile(reportPath+".md", md, 0644)
+		emit(pipeline.EventToolResult, "report", fmt.Sprintf("Markdown report: %s.md", reportPath))
+	}
+	if cc.Format == "all" || cc.Format == "json" {
+		js, _ := renderer.ToJSON(pentestReport)
+		os.WriteFile(reportPath+".json", js, 0644)
+		emit(pipeline.EventToolResult, "report", fmt.Sprintf("JSON report: %s.json", reportPath))
+	}
+	if cc.Format == "all" || cc.Format == "html" {
+		html, _ := renderer.ToHTML(pentestReport)
+		os.WriteFile(reportPath+".html", html, 0644)
+		emit(pipeline.EventToolResult, "report", fmt.Sprintf("HTML report: %s.html", reportPath))
+	}
+
+	// Complete
+	sm.Complete()
+
+	elapsed := time.Since(start).Round(time.Second)
+	emit(pipeline.EventMilestone, "orchestrator", fmt.Sprintf(
+		"Campaign complete in %s. %d findings (%d critical, %d high). Risk: %s. Report: %s",
+		elapsed, len(findingSet.Findings),
+		findingSet.Summary.BySeverity[pipeline.SeverityCritical],
+		findingSet.Summary.BySeverity[pipeline.SeverityHigh],
+		pentestReport.RiskSummary.OverallRisk,
+		reportPath))
+
+	// Save learned patterns to memory
+	patterns := memory.ExtractPatterns(surface, findingSet.Findings)
+	for _, p := range patterns {
+		r.memoryStore.Save(p)
+	}
+
+	return nil
+}
+
+// --- Helpers ---
+
+func buildScope(scopes []string) (*scope.ScopeDefinition, error) {
+	def := &scope.ScopeDefinition{}
+	for _, s := range scopes {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		// If it contains a /, treat as CIDR
+		if strings.Contains(s, "/") {
+			def.AllowedCIDRs = append(def.AllowedCIDRs, s)
+		} else {
+			def.AllowedDomains = append(def.AllowedDomains, s)
+		}
+	}
+	if len(def.AllowedCIDRs) == 0 && len(def.AllowedDomains) == 0 {
+		return nil, fmt.Errorf("scope must contain at least one domain or CIDR")
+	}
+	return def, nil
+}
+
+func extractRawFindings(surface *pipeline.AttackSurface, campaignID uuid.UUID) []pipeline.RawFinding {
+	var findings []pipeline.RawFinding
+
+	for _, host := range surface.Hosts {
+		for _, port := range host.OpenPorts {
+			svc := host.Services[port]
+			detail := fmt.Sprintf("Port %d open", port)
+			if svc.Name != "" {
+				detail = fmt.Sprintf("Port %d open — %s %s", port, svc.Name, svc.Version)
+			}
+			findings = append(findings, pipeline.RawFinding{
+				ID:           uuid.New(),
+				CampaignID:   campaignID,
+				Source:       "naabu",
+				Type:         "open_port",
+				Target:       host.IP,
+				Detail:       detail,
+				DiscoveredAt: time.Now(),
+			})
+		}
+	}
+
+	for _, ep := range surface.Endpoints {
+		if ep.Interesting {
+			findings = append(findings, pipeline.RawFinding{
+				ID:           uuid.New(),
+				CampaignID:   campaignID,
+				Source:       "katana",
+				Type:         "interesting_endpoint",
+				Target:       ep.URL,
+				Detail:       fmt.Sprintf("Interesting endpoint: %s (%s) — %s", ep.URL, ep.Method, ep.Notes),
+				DiscoveredAt: time.Now(),
+			})
+		}
+	}
+
+	for tech, version := range surface.Technologies {
+		findings = append(findings, pipeline.RawFinding{
+			ID:           uuid.New(),
+			CampaignID:   campaignID,
+			Source:       "httpx",
+			Type:         "technology",
+			Target:       surface.Target,
+			Detail:       fmt.Sprintf("Technology detected: %s %s", tech, version),
+			DiscoveredAt: time.Now(),
+		})
+	}
+
+	return findings
+}
+
+func pathName(plan *pipeline.AttackPlan) string {
+	if len(plan.Paths) > 0 {
+		return plan.Paths[0].Name
+	}
+	return "none"
+}
+
+func pathProb(plan *pipeline.AttackPlan) float64 {
+	if len(plan.Paths) > 0 {
+		return plan.Paths[0].EstimatedSuccessProbability
+	}
+	return 0
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+// Ensure json import is used (for future DB persistence)
+var _ = json.Marshal
