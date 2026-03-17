@@ -1,81 +1,159 @@
-## Introduction - HackRecon (Pentest GPT)
+# autopentest
 
-HackRecon is an innovative assistant for penetration testing, we used the `OpenHermes-2.5-Mistral-7B` model, we jailbroke it, finetuned it with commands for popular Kali Linux tools and it's now able to provide guided, actionable steps and command automation for performing deep pen tests.
-We've launched the updated model here - https://huggingface.co/ArmurAI/Pentest_AI
+**Autonomous AI-Powered Penetration Testing**
 
-![Title Image](https://github.com/Armur-Ai/Auto-Pentest-GPT-AI/blob/main/images/Auto_Pentest.png)
+A multi-agent AI system built in Go that autonomously performs full-cycle penetration tests — from reconnaissance through exploitation to professional reporting — powered by specialist AI agents coordinated by an orchestrator.
 
-## Setup and Installation
+<!-- badges -->
+![GitHub Stars](https://img.shields.io/github/stars/Armur-Ai/autopentest?style=flat-square)
+![License](https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square)
+![Go](https://img.shields.io/badge/Go-1.24-00ADD8?style=flat-square&logo=go)
 
-### Requirements
+---
 
-- Operating System: Kali Linux, Windows, or MacOS
-- Python version 3.x
-- Internet access for downloading necessary files and tools
+## Quick Start
 
-### Installation Steps
+```bash
+# Install
+brew install armur-ai/tap/autopentest     # macOS
+# or
+curl -sSL https://install.autopentest.ai | sh  # Linux
+# or
+docker compose -f deploy/docker-compose.yml up  # Docker
 
-1. **Install Python Libraries**: Use `pip install transformers colorama torch` to install required libraries.
-2. **Download the Model File**: Obtain `https://huggingface.co/ArmurAI/Pentest_AI` and note its path.
-3. **Update Script**: Modify the `model_path` variable in the script to the model file's location.
+# Configure (just needs a Claude API key)
+export AUTOPENTEST_ORCHESTRATOR_API_KEY=sk-ant-your-key-here
 
-### Execution
-
-Run the script using `python pentest_ai.py` and follow the interactive prompts.
-
-## Code Explanation with Snippets
-
-### Check and Install Tools
-
-The script starts by checking if necessary penetration testing tools are installed, installing any missing ones:
-
-```python
-def check_and_install_tools(tools):
-    for tool in tools:
-        result = subprocess.run(['which', tool], stdout=subprocess.PIPE)
-        if not result.stdout.strip():
-            subprocess.run(['sudo', 'apt-get', 'install', '-y', tool])
+# Scan
+autopentest scan example.com --scope example.com
 ```
 
-This function checks each tool in the `tools` list, installing it using `apt-get` if not found.
+That's it. All agents use your Claude API key. No Ollama, no model downloads, no GPU needed.
 
-### Model Initialization
+---
 
-The script loads the `OpenHermes-2.5-Mistral-7B` model with a specific path and configuration:
+## How It Works
 
-```python
-tokenizer = AutoTokenizer.from_pretrained("ArmurAI/Pentest_AI")
-model_path = "<path_to_model>"
-model = AutoModelForCausalLM.from_pretrained(model_path, gpu_layers=12, threads=1)
+```
+You: autopentest scan target.com --scope target.com
+
+Orchestrator (Claude) plans the campaign
+    |
+    +---> Recon Agent runs subfinder, httpx, nuclei, naabu, katana, dnsx, gau
+    |         --> builds structured AttackSurface
+    |
+    +---> Classifier Agent maps CVEs, scores CVSS, filters false positives
+    |         --> produces ranked ClassifiedFindingSet
+    |
+    +---> Exploit Agent constructs multi-step attack chains
+    |         --> executes with scope validation + cleanup registration
+    |
+    +---> Report Agent generates professional PDF/HTML/Markdown report
+
+You: open report.pdf
 ```
 
-This initializes the tokenizer and model, setting parameters like `gpu_layers` and `threads` for performance optimization.
+## Architecture
 
-### Interactive User Interface
-
-The script interacts with the user, asking for input and providing guidance based on the user's actions:
-
-```python
-sys_env = input("Select your environment (1, 2, or 3): ")
-if sys_env == '1':
-    check_and_install_tools(pentest_tools)
+```
+                        Go CLI (Cobra)
+                            |
+                    Go Backend (single binary)
+                            |
+            +-------+-------+-------+-------+
+            |       |       |       |       |
+          Recon  Classify Exploit Report  Orchestrator
+          Agent   Agent   Agent   Agent    (ReAct loop)
+            |
+    subfinder · httpx · nuclei · naabu · katana · dnsx · gau
+            |
+    PostgreSQL + pgvector · Redis · Docker API
 ```
 
-It prompts the user to select their operating system environment and, if Kali Linux is chosen, it checks for and installs the necessary tools.
+## Features
 
-### Command Execution
+**Core**
+- 5-agent architecture: Orchestrator + Recon + Classifier + Exploit + Report
+- 7 native Go security tool wrappers (no subprocess overhead)
+- CVSS v3.1 scoring engine per FIRST specification
+- Scope enforcement on every command (hard-coded, no exceptions)
+- Campaign state machine with emergency stop
 
-For Kali Linux, the script can execute pentesting commands automatically:
+**Modes**
+- Manual pentesting with full control
+- Bug bounty mode (HackerOne/Bugcrowd scope import, dedup, formatted reports)
+- Continuous ASM (watch scope, auto-trigger on new assets)
+- CTF mode (autonomous HackTheBox/TryHackMe solving)
 
-```python
-def execute_tool_command(output, ip_address):
-    if 'nmap' in output:
-        command_output = os.popen(f'nmap -sV {ip_address}').read()
-        print(command_output)
+**Integrations**
+- MCP Server for Claude Desktop and Cursor (`autopentest mcp serve`)
+- VS Code / Cursor extension with inline findings
+- GitHub Action for CI/CD security scanning (SARIF output)
+- Jira, Slack, SIEM (CEF/STIX/SARIF), webhooks with HMAC signing
+
+**Ecosystem**
+- Community attack playbooks (YAML, like nuclei-templates)
+- Agent memory that gets smarter with every scan
+- Shared intelligence network (opt-in, anonymized)
+- Plugin system for custom tools and report templates
+
+**Distribution**
+- Single Go binary: `brew install`, `docker compose up`, `go install`
+- Next.js 15 web dashboard with dark theme (embedded in binary)
+- Beautiful terminal TUI with multi-panel agent activity view
+- npm, Docker Hub, Snap Store, Winget — public download metrics everywhere
+
+## CLI Commands
+
+```
+autopentest scan <target> --scope <scope>    # Start a pentest
+autopentest campaign watch <id>               # Live TUI dashboard
+autopentest campaign explore <id>             # Browse attack surface
+autopentest explain <finding-id>              # Explain in plain English
+autopentest doctor                            # Health check
+autopentest serve                             # Start API + dashboard
+autopentest mcp serve                         # MCP server for Claude/Cursor
+autopentest ctf solve <target>                # Autonomous CTF solving
+autopentest playbook run <name>               # Run community playbook
 ```
 
-This function parses the assistant's output for tool names and executes the corresponding command, showing the command output to the user.
+## LLM Providers
 
-## Conclusion
+| Provider | Setup | Privacy | Cost |
+|----------|-------|---------|------|
+| **Claude** (default) | Just set API key | Cloud | Pay per token |
+| **Ollama** | Install + pull models | 100% local | Free (your GPU) |
+| **LM Studio** | Load model + enable server | 100% local | Free (your GPU) |
 
-PentestAI is designed to streamline the penetration testing process by integrating AI-powered guidance with practical command execution, making it a powerful tool for security professionals and enthusiasts alike.
+All agents inherit the orchestrator's provider. Set one API key, everything works.
+
+## Tech Stack
+
+| Component | Technology |
+|-----------|-----------|
+| Platform | Go 1.24 (single binary) |
+| CLI | Cobra + bubbletea TUI |
+| LLM | Claude API, Ollama, LM Studio |
+| Security tools | subfinder, httpx, nuclei, naabu, katana, dnsx, gau (native Go) |
+| API | Fiber (fasthttp) |
+| Database | PostgreSQL 16 + pgvector |
+| Cache | Redis 7 |
+| Dashboard | Next.js 15 + shadcn/ui + tremor |
+| MCP | JSON-RPC over stdio |
+
+## Development
+
+```bash
+git clone https://github.com/Armur-Ai/autopentest.git
+cd autopentest
+./scripts/setup.sh   # Install tools, start services
+make build           # Compile binary
+make test            # Run tests
+make dev             # Start with hot-reload
+```
+
+## License
+
+Apache 2.0 — see [LICENSE](LICENSE).
+
+Built by [Armur AI](https://github.com/Armur-Ai).
