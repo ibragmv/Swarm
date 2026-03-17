@@ -15,11 +15,9 @@ func NewGauTool() *GauTool { return &GauTool{} }
 
 func (g *GauTool) Name() string { return "gau" }
 
-func (g *GauTool) IsAvailable() bool { return true }
+func (g *GauTool) IsAvailable() bool { return IsCommandAvailable("gau") }
 
 func (g *GauTool) Run(ctx context.Context, target string, opts Options) (*ToolResult, error) {
-	start := time.Now()
-
 	scopeDef := getScopeFromContext(ctx)
 	if scopeDef != nil {
 		if err := scope.Validate(target, *scopeDef); err != nil {
@@ -27,10 +25,10 @@ func (g *GauTool) Run(ctx context.Context, target string, opts Options) (*ToolRe
 		}
 	}
 
-	return &ToolResult{
-		ToolName:  "gau",
-		Target:    target,
-		RawOutput: fmt.Sprintf("gau %s --providers wayback,commoncrawl,otx,urlscan --json", target),
-		Duration:  time.Since(start),
-	}, nil
+	timeout := time.Duration(opts.GetInt("timeout", 60)) * time.Second
+
+	args := []string{target, "--json"}
+
+	result := RunToolCommand(ctx, "gau", target, timeout, "gau", args...)
+	return result, result.Error
 }

@@ -15,11 +15,9 @@ func NewNaabuTool() *NaabuTool { return &NaabuTool{} }
 
 func (n *NaabuTool) Name() string { return "naabu" }
 
-func (n *NaabuTool) IsAvailable() bool { return true }
+func (n *NaabuTool) IsAvailable() bool { return IsCommandAvailable("naabu") }
 
 func (n *NaabuTool) Run(ctx context.Context, target string, opts Options) (*ToolResult, error) {
-	start := time.Now()
-
 	scopeDef := getScopeFromContext(ctx)
 	if scopeDef != nil {
 		if err := scope.Validate(target, *scopeDef); err != nil {
@@ -27,12 +25,11 @@ func (n *NaabuTool) Run(ctx context.Context, target string, opts Options) (*Tool
 		}
 	}
 
+	timeout := time.Duration(opts.GetInt("timeout", 60)) * time.Second
 	ports := opts.GetString("ports", "top-1000")
 
-	return &ToolResult{
-		ToolName:  "naabu",
-		Target:    target,
-		RawOutput: fmt.Sprintf("naabu -host %s -p %s -json", target, ports),
-		Duration:  time.Since(start),
-	}, nil
+	args := []string{"-host", target, "-json", "-silent", "-p", ports}
+
+	result := RunToolCommand(ctx, "naabu", target, timeout, "naabu", args...)
+	return result, result.Error
 }

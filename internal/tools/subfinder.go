@@ -16,12 +16,11 @@ func NewSubfinderTool() *SubfinderTool { return &SubfinderTool{} }
 
 func (s *SubfinderTool) Name() string { return "subfinder" }
 
-func (s *SubfinderTool) IsAvailable() bool { return true }
+func (s *SubfinderTool) IsAvailable() bool {
+	return IsCommandAvailable("subfinder")
+}
 
 func (s *SubfinderTool) Run(ctx context.Context, target string, opts Options) (*ToolResult, error) {
-	start := time.Now()
-
-	// Scope validation
 	scopeDef := getScopeFromContext(ctx)
 	if scopeDef != nil {
 		if err := scope.Validate(target, *scopeDef); err != nil {
@@ -29,26 +28,29 @@ func (s *SubfinderTool) Run(ctx context.Context, target string, opts Options) (*
 		}
 	}
 
-	// In production, this calls subfinder as a Go library:
-	//   runner, _ := subfinder.NewRunner(&runner.Options{...})
-	//   results := runner.EnumerateMultipleDomains(ctx, []string{target})
-	//
-	// For now, return a placeholder result that follows the correct structure.
-	// The actual library integration will replace this body when we add
-	// the projectdiscovery dependency.
+	timeout := time.Duration(opts.GetInt("timeout", 300)) * time.Second
+	args := []string{"-d", target, "-silent"}
 
-	result := &ToolResult{
-		ToolName:  "subfinder",
-		Target:    target,
-		RawOutput: fmt.Sprintf("subfinder -d %s -silent", target),
-		Duration:  time.Since(start),
+	if opts.GetBool("recursive", false) {
+		args = append(args, "-recursive")
 	}
 
-	return result, nil
+	result := RunToolCommand(ctx, "subfinder", target, timeout, "subfinder", args...)
+
+	// Parse subdomains from output (one per line)
+	if result.Error == nil && result.RawOutput != "" {
+		for _, line := range splitLines(result.RawOutput) {
+			result.ParsedFindings = append(result.ParsedFindings, map[string]any{
+				"subdomain": line,
+				"source":    "subfinder",
+			})
+		}
+	}
+
+	return result, result.Error
 }
 
 // getScopeFromContext extracts scope definition from context.
-// This is set by the coordinator before running any tool.
 func getScopeFromContext(ctx context.Context) *scope.ScopeDefinition {
 	if v := ctx.Value(scopeContextKey); v != nil {
 		if s, ok := v.(*scope.ScopeDefinition); ok {
@@ -67,7 +69,6 @@ func WithScope(ctx context.Context, s *scope.ScopeDefinition) context.Context {
 	return context.WithValue(ctx, scopeContextKey, s)
 }
 
-// splitLines splits output by newlines, filtering empty lines.
 func splitLines(s string) []string {
 	var lines []string
 	for _, line := range strings.Split(s, "\n") {

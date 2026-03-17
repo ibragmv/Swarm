@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/scope"
@@ -15,11 +16,9 @@ func NewNucleiTool() *NucleiTool { return &NucleiTool{} }
 
 func (n *NucleiTool) Name() string { return "nuclei" }
 
-func (n *NucleiTool) IsAvailable() bool { return true }
+func (n *NucleiTool) IsAvailable() bool { return IsCommandAvailable("nuclei") }
 
 func (n *NucleiTool) Run(ctx context.Context, target string, opts Options) (*ToolResult, error) {
-	start := time.Now()
-
 	scopeDef := getScopeFromContext(ctx)
 	if scopeDef != nil {
 		if err := scope.Validate(target, *scopeDef); err != nil {
@@ -27,18 +26,15 @@ func (n *NucleiTool) Run(ctx context.Context, target string, opts Options) (*Too
 		}
 	}
 
-	// In production, uses nuclei v3 as a Go library.
-	// Default template categories for recon: technologies, exposures, misconfiguration
+	timeout := time.Duration(opts.GetInt("timeout", 120)) * time.Second
 
 	severity := opts.GetStringSlice("severity")
 	if severity == nil {
 		severity = []string{"critical", "high", "medium"}
 	}
 
-	return &ToolResult{
-		ToolName:  "nuclei",
-		Target:    target,
-		RawOutput: fmt.Sprintf("nuclei -u %s -severity %v -json", target, severity),
-		Duration:  time.Since(start),
-	}, nil
+	args := []string{"-u", target, "-json", "-silent", "-severity", strings.Join(severity, ",")}
+
+	result := RunToolCommand(ctx, "nuclei", target, timeout, "nuclei", args...)
+	return result, result.Error
 }

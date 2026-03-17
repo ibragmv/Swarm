@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/scope"
@@ -15,11 +16,9 @@ func NewKatanaTool() *KatanaTool { return &KatanaTool{} }
 
 func (k *KatanaTool) Name() string { return "katana" }
 
-func (k *KatanaTool) IsAvailable() bool { return true }
+func (k *KatanaTool) IsAvailable() bool { return IsCommandAvailable("katana") }
 
 func (k *KatanaTool) Run(ctx context.Context, target string, opts Options) (*ToolResult, error) {
-	start := time.Now()
-
 	scopeDef := getScopeFromContext(ctx)
 	if scopeDef != nil {
 		if err := scope.Validate(target, *scopeDef); err != nil {
@@ -27,12 +26,11 @@ func (k *KatanaTool) Run(ctx context.Context, target string, opts Options) (*Too
 		}
 	}
 
+	timeout := time.Duration(opts.GetInt("timeout", 60)) * time.Second
 	depth := opts.GetInt("depth", 3)
 
-	return &ToolResult{
-		ToolName:  "katana",
-		Target:    target,
-		RawOutput: fmt.Sprintf("katana -u %s -d %d -json -js-crawl", target, depth),
-		Duration:  time.Since(start),
-	}, nil
+	args := []string{"-u", target, "-json", "-silent", "-d", strconv.Itoa(depth)}
+
+	result := RunToolCommand(ctx, "katana", target, timeout, "katana", args...)
+	return result, result.Error
 }

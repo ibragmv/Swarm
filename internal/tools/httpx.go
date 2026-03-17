@@ -8,18 +8,13 @@ import (
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/scope"
 )
 
-// HttpxTool wraps httpx for HTTP probing and technology detection.
 type HttpxTool struct{}
 
 func NewHttpxTool() *HttpxTool { return &HttpxTool{} }
-
 func (h *HttpxTool) Name() string { return "httpx" }
-
-func (h *HttpxTool) IsAvailable() bool { return true }
+func (h *HttpxTool) IsAvailable() bool { return IsCommandAvailable("httpx") }
 
 func (h *HttpxTool) Run(ctx context.Context, target string, opts Options) (*ToolResult, error) {
-	start := time.Now()
-
 	scopeDef := getScopeFromContext(ctx)
 	if scopeDef != nil {
 		if err := scope.Validate(target, *scopeDef); err != nil {
@@ -27,16 +22,13 @@ func (h *HttpxTool) Run(ctx context.Context, target string, opts Options) (*Tool
 		}
 	}
 
-	// In production, this calls httpx as a Go library:
-	//   runner, _ := httpx.New(&httpx.Options{...})
-	//   results := runner.Run(targets)
-	//
-	// Placeholder for now.
+	timeout := time.Duration(opts.GetInt("timeout", 30)) * time.Second
+	args := []string{"-u", target, "-json", "-tech-detect", "-status-code", "-title", "-server", "-silent"}
 
-	return &ToolResult{
-		ToolName:  "httpx",
-		Target:    target,
-		RawOutput: fmt.Sprintf("httpx -u %s -json -tech-detect -status-code -title", target),
-		Duration:  time.Since(start),
-	}, nil
+	if opts.GetBool("follow_redirects", true) {
+		args = append(args, "-follow-redirects")
+	}
+
+	result := RunToolCommand(ctx, "httpx", target, timeout, "httpx", args...)
+	return result, result.Error
 }
