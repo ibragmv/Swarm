@@ -1,18 +1,18 @@
 version: "3.9"
 
 services:
-  autopentest:
+  pentestswarm:
     build:
       context: ../..
       dockerfile: deploy/docker/Dockerfile
     ports:
       - "8080:8080"
     environment:
-      AUTOPENTEST_DATABASE_HOST: postgres
-      AUTOPENTEST_DATABASE_PASSWORD: autopentest
-      AUTOPENTEST_REDIS_HOST: redis
-      AUTOPENTEST_ORCHESTRATOR_PROVIDER: ollama
-      AUTOPENTEST_ORCHESTRATOR_ENDPOINT: http://ollama:11434
+      PENTESTSWARM_DATABASE_HOST: postgres
+      PENTESTSWARM_DATABASE_PASSWORD: pentestswarm
+      PENTESTSWARM_REDIS_HOST: redis
+      PENTESTSWARM_ORCHESTRATOR_PROVIDER: ollama
+      PENTESTSWARM_ORCHESTRATOR_ENDPOINT: http://ollama:11434
     depends_on:
       postgres:
         condition: service_healthy
@@ -23,15 +23,15 @@ services:
   postgres:
     image: pgvector/pgvector:pg16
     environment:
-      POSTGRES_USER: autopentest
-      POSTGRES_PASSWORD: autopentest
-      POSTGRES_DB: autopentest
+      POSTGRES_USER: pentestswarm
+      POSTGRES_PASSWORD: pentestswarm
+      POSTGRES_DB: pentestswarm
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U autopentest"]
+      test: ["CMD-SHELL", "pg_isready -U pentestswarm"]
       interval: 5s
       timeout: 5s
       retries: 5

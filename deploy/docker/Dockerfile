@@ -8,16 +8,16 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /autopentest ./cmd/autopentest/
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /pentestswarm ./cmd/pentestswarm/
 
 # Runtime stage
 FROM alpine:3.19
 
 RUN apk add --no-cache ca-certificates tzdata
 
-COPY --from=builder /autopentest /usr/local/bin/autopentest
+COPY --from=builder /pentestswarm /usr/local/bin/pentestswarm
 
 EXPOSE 8080
 
-ENTRYPOINT ["autopentest"]
+ENTRYPOINT ["pentestswarm"]
 CMD ["serve"]

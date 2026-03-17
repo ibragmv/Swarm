@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Armur-Ai/autopentest/internal/agent/classifier"
-	"github.com/Armur-Ai/autopentest/internal/agent/recon"
-	"github.com/Armur-Ai/autopentest/internal/agent/report"
-	"github.com/Armur-Ai/autopentest/internal/llm"
-	"github.com/Armur-Ai/autopentest/internal/pipeline"
-	"github.com/Armur-Ai/autopentest/internal/scope"
-	"github.com/Armur-Ai/autopentest/internal/tools"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/agent/classifier"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/agent/recon"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/agent/report"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/llm"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/pipeline"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/scope"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/tools"
 	"github.com/google/uuid"
 )
 
@@ -103,7 +103,7 @@ func setupProvider(t *testing.T) llm.Provider {
 	t.Helper()
 
 	// Try Claude first
-	apiKey := envOrSkip(t, "AUTOPENTEST_ORCHESTRATOR_API_KEY", "ANTHROPIC_API_KEY")
+	apiKey := envOrSkip(t, "PENTESTSWARM_ORCHESTRATOR_API_KEY", "ANTHROPIC_API_KEY")
 	if apiKey != "" {
 		provider := llm.NewClaudeProvider(llm.ClaudeProviderConfig{
 			APIKey: apiKey,

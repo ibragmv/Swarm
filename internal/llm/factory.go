@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Armur-Ai/autopentest/internal/config"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/config"
 )
 
 // NewProvider creates the appropriate LLM provider based on configuration.
@@ -49,7 +49,7 @@ func newProviderFromParams(provider, apiKey, model, endpoint string, contextWind
 	switch provider {
 	case "claude":
 		if apiKey == "" {
-			return nil, fmt.Errorf("claude provider requires api_key — set AUTOPENTEST_ORCHESTRATOR_API_KEY or orchestrator.api_key in config.yaml")
+			return nil, fmt.Errorf("claude provider requires api_key — set PENTESTSWARM_ORCHESTRATOR_API_KEY or orchestrator.api_key in config.yaml")
 		}
 		return NewClaudeProvider(ClaudeProviderConfig{
 			APIKey:        apiKey,

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Armur-Ai/autopentest/internal/pipeline"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/pipeline"
 )
 
 // HackerOneReport is formatted for HackerOne submission.

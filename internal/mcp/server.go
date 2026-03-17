@@ -103,7 +103,7 @@ func (s *Server) handleRequest(req jsonRPCRequest) {
 				"resources": map[string]any{},
 			},
 			"serverInfo": map[string]any{
-				"name":    "autopentest",
+				"name":    "pentestswarm",
 				"version": "1.0.0",
 			},
 		})

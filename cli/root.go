@@ -17,9 +17,9 @@ var (
 
 // rootCmd is the base command.
 var rootCmd = &cobra.Command{
-	Use:   "autopentest",
+	Use:   "pentestswarm",
 	Short: "Autonomous AI-Powered Penetration Testing",
-	Long: `autopentest is a multi-agent AI system that autonomously performs
+	Long: `pentestswarm is a multi-agent AI system that autonomously performs
 full-cycle penetration tests — from continuous recon through exploitation
 through professional reporting — powered by specialist AI models
 coordinated by an orchestrator agent.`,

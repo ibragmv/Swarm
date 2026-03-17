@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-// RegisterDefaultTools adds all autopentest tools to the MCP server.
+// RegisterDefaultTools adds all pentestswarm tools to the MCP server.
 func RegisterDefaultTools(s *Server) {
 	s.RegisterTool(MCPTool{
 		Name:        "scan_target",

@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	apperrors "github.com/Armur-Ai/autopentest/internal/errors"
+	apperrors "github.com/Armur-Ai/Pentest-Swarm-AI/internal/errors"
 )
 
 // ScopeDefinition defines what targets are allowed.

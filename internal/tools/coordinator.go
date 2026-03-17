@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Armur-Ai/autopentest/internal/scope"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/scope"
 )
 
 // ToolRunSummary aggregates results from running multiple tools.

@@ -1,6 +1,6 @@
 # Binaries
 /bin/
-/autopentest
+/pentestswarm
 *.exe
 *.dll
 *.so

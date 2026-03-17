@@ -61,7 +61,7 @@ func (a *Aggregator) Collect() *Metrics {
 }
 
 func (a *Aggregator) fetchNPM() int {
-	resp, err := a.client.Get("https://api.npmjs.org/downloads/point/last-week/@armurai/autopentest")
+	resp, err := a.client.Get("https://api.npmjs.org/downloads/point/last-week/@armurai/pentestswarm")
 	if err != nil {
 		return 0
 	}
@@ -73,7 +73,7 @@ func (a *Aggregator) fetchNPM() int {
 }
 
 func (a *Aggregator) fetchDockerHub() int {
-	resp, err := a.client.Get("https://hub.docker.com/v2/repositories/armurai/autopentest/")
+	resp, err := a.client.Get("https://hub.docker.com/v2/repositories/armurai/pentestswarm/")
 	if err != nil {
 		return 0
 	}
@@ -85,7 +85,7 @@ func (a *Aggregator) fetchDockerHub() int {
 }
 
 func (a *Aggregator) fetchGitHubReleases() int {
-	resp, err := a.client.Get("https://api.github.com/repos/Armur-Ai/autopentest/releases")
+	resp, err := a.client.Get("https://api.github.com/repos/Armur-Ai/pentestswarm/releases")
 	if err != nil {
 		return 0
 	}
@@ -109,7 +109,7 @@ func (a *Aggregator) fetchGitHubReleases() int {
 }
 
 func (a *Aggregator) fetchPyPI() int {
-	resp, err := a.client.Get("https://pypistats.org/api/packages/autopentest-sdk/recent")
+	resp, err := a.client.Get("https://pypistats.org/api/packages/pentestswarm-sdk/recent")
 	if err != nil {
 		return 0
 	}

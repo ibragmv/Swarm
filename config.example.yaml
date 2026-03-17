@@ -1,7 +1,7 @@
-# autopentest configuration
+# pentestswarm configuration
 # Copy this to config.yaml and fill in your values.
-# All values can be overridden via environment variables prefixed with AUTOPENTEST_
-# Example: AUTOPENTEST_ORCHESTRATOR_API_KEY=sk-ant-...
+# All values can be overridden via environment variables prefixed with PENTESTSWARM_
+# Example: PENTESTSWARM_ORCHESTRATOR_API_KEY=sk-ant-...
 
 # --- Server ---
 server:
@@ -12,9 +12,9 @@ server:
 database:
   host: "localhost"
   port: 5432
-  user: "autopentest"
-  password: ""             # REQUIRED — set via AUTOPENTEST_DATABASE_PASSWORD
-  name: "autopentest"
+  user: "pentestswarm"
+  password: ""             # REQUIRED — set via PENTESTSWARM_DATABASE_PASSWORD
+  name: "pentestswarm"
   sslmode: "disable"       # disable, require, verify-ca, verify-full
 
 # --- Redis ---
@@ -28,7 +28,7 @@ redis:
 orchestrator:
   provider: "claude"       # claude, ollama, lmstudio
   model: "claude-sonnet-4-6" # Model to use for orchestration
-  api_key: ""              # REQUIRED for Claude — set via AUTOPENTEST_ORCHESTRATOR_API_KEY
+  api_key: ""              # REQUIRED for Claude — set via PENTESTSWARM_ORCHESTRATOR_API_KEY
   endpoint: ""             # Required for ollama/lmstudio (e.g. http://localhost:11434)
   context_window: 200000   # Max context window size in tokens
   max_tokens: 8192         # Max output tokens per completion
@@ -108,7 +108,7 @@ intelligence:
   enabled: false           # Must be explicitly enabled (opt-in)
   share_patterns: false    # Contribute anonymized patterns to community
   consume_patterns: false  # Use community patterns to improve scans
-  api_endpoint: "https://api.autopentest.ai"
+  api_endpoint: "https://api.pentestswarm.ai"
 
 # --- Integrations ---
 integrations:

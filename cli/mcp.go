@@ -3,7 +3,7 @@ package cli
 import (
 	"fmt"
 
-	mcpserver "github.com/Armur-Ai/autopentest/internal/mcp"
+	mcpserver "github.com/Armur-Ai/Pentest-Swarm-AI/internal/mcp"
 	"github.com/spf13/cobra"
 )
 
@@ -15,14 +15,14 @@ var mcpCmd = &cobra.Command{
 var mcpServeCmd = &cobra.Command{
 	Use:   "serve",
 	Short: "Start MCP server (stdio transport)",
-	Long: `Starts an MCP server that exposes autopentest tools to Claude Desktop,
+	Long: `Starts an MCP server that exposes pentestswarm tools to Claude Desktop,
 Cursor, and any MCP-compatible AI client.
 
 Add to Claude Desktop config:
   {
     "mcpServers": {
-      "autopentest": {
-        "command": "autopentest",
+      "pentestswarm": {
+        "command": "pentestswarm",
         "args": ["mcp", "serve"]
       }
     }
@@ -31,7 +31,7 @@ Add to Claude Desktop config:
 		server := mcpserver.NewServer()
 		mcpserver.RegisterDefaultTools(server)
 
-		fmt.Fprintln(cmd.ErrOrStderr(), "autopentest MCP server started (stdio)")
+		fmt.Fprintln(cmd.ErrOrStderr(), "pentestswarm MCP server started (stdio)")
 		return server.Serve()
 	},
 }

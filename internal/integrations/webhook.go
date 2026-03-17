@@ -79,7 +79,7 @@ func (w *WebhookSender) deliver(cfg WebhookConfig, event WebhookEvent) {
 		}
 
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("User-Agent", "autopentest-webhook/1.0")
+		req.Header.Set("User-Agent", "pentestswarm-webhook/1.0")
 		req.Header.Set("X-Autopentest-Event", event.EventType)
 
 		// HMAC signature

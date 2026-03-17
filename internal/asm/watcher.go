@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Armur-Ai/autopentest/internal/pipeline"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/pipeline"
 	"github.com/google/uuid"
 )
 

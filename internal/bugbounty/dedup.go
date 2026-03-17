@@ -3,7 +3,7 @@ package bugbounty
 import (
 	"strings"
 
-	"github.com/Armur-Ai/autopentest/internal/pipeline"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/pipeline"
 )
 
 // DuplicateResult indicates whether a finding is a potential duplicate.

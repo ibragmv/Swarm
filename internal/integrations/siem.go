@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Armur-Ai/autopentest/internal/pipeline"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/pipeline"
 )
 
 // FormatCEF converts a finding to Common Event Format for SIEM ingestion.
@@ -14,7 +14,7 @@ func FormatCEF(finding pipeline.ClassifiedFinding) string {
 	severity := cefSeverity(finding.Severity)
 
 	return fmt.Sprintf(
-		"CEF:0|ArmurAI|autopentest|1.0|%s|%s|%d|src=%s cat=%s cvss=%.1f msg=%s",
+		"CEF:0|ArmurAI|pentestswarm|1.0|%s|%s|%d|src=%s cat=%s cvss=%.1f msg=%s",
 		finding.AttackCategory,
 		finding.Title,
 		severity,
@@ -34,9 +34,9 @@ func FormatSARIF(findings []pipeline.ClassifiedFinding) ([]byte, error) {
 			{
 				"tool": map[string]any{
 					"driver": map[string]any{
-						"name":           "autopentest",
+						"name":           "pentestswarm",
 						"version":        "1.0.0",
-						"informationUri": "https://github.com/Armur-Ai/autopentest",
+						"informationUri": "https://github.com/Armur-Ai/Pentest-Swarm-AI",
 						"rules":          buildSARIFRules(findings),
 					},
 				},

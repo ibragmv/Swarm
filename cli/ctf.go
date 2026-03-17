@@ -15,9 +15,9 @@ var ctfSolveCmd = &cobra.Command{
 	Use:   "solve <target>",
 	Short: "Autonomously solve a CTF machine",
 	Args:  cobra.ExactArgs(1),
-	Example: `  autopentest ctf solve 10.10.10.1
-  autopentest ctf solve 10.10.10.1 --platform htb --machine Lame
-  autopentest ctf solve 10.10.10.1 --follow`,
+	Example: `  pentestswarm ctf solve 10.10.10.1
+  pentestswarm ctf solve 10.10.10.1 --platform htb --machine Lame
+  pentestswarm ctf solve 10.10.10.1 --follow`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		target := args[0]
 		platform, _ := cmd.Flags().GetString("platform")
@@ -32,7 +32,7 @@ var ctfSolveCmd = &cobra.Command{
 var ctfListCmd = &cobra.Command{
 	Use:     "list",
 	Short:   "List available CTF machines",
-	Example: "  autopentest ctf list --platform htb --difficulty easy",
+	Example: "  pentestswarm ctf list --platform htb --difficulty easy",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Println("Listing CTF machines...")
 		// TODO: Wire to platform client
@@ -44,7 +44,7 @@ var ctfWriteupCmd = &cobra.Command{
 	Use:     "writeup <campaign-id>",
 	Short:   "Generate writeup from a CTF campaign",
 	Args:    cobra.ExactArgs(1),
-	Example: "  autopentest ctf writeup abc-123",
+	Example: "  pentestswarm ctf writeup abc-123",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Printf("Generating writeup for campaign %s...\n", args[0])
 		return nil

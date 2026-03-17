@@ -27,7 +27,7 @@ linters-settings:
   misspell:
     locale: US
   goimports:
-    local-prefixes: github.com/Armur-Ai/autopentest
+    local-prefixes: github.com/Armur-Ai/Pentest-Swarm-AI
 
 issues:
   exclude-use-default: false

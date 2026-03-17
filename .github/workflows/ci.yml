@@ -50,7 +50,7 @@ jobs:
       - name: Build binary
         run: make build
       - name: Verify binary runs
-        run: ./bin/autopentest --version
+        run: ./bin/pentestswarm --version
 
   docker:
     name: Docker
@@ -61,7 +61,7 @@ jobs:
       - name: Build Docker image
         run: |
           if [ -f deploy/docker/Dockerfile ]; then
-            docker build -f deploy/docker/Dockerfile -t autopentest:ci .
+            docker build -f deploy/docker/Dockerfile -t pentestswarm:ci .
           else
             echo "Dockerfile not yet created, skipping Docker build"
           fi

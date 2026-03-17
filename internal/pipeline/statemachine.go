@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	apperrors "github.com/Armur-Ai/autopentest/internal/errors"
+	apperrors "github.com/Armur-Ai/Pentest-Swarm-AI/internal/errors"
 )
 
 // validTransitions defines allowed state transitions.

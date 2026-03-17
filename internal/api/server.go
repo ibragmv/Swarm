@@ -18,7 +18,7 @@ type Server struct {
 // NewServer creates a new API server.
 func NewServer(port int) *Server {
 	app := fiber.New(fiber.Config{
-		AppName:      "autopentest",
+		AppName:      "pentestswarm",
 		ErrorHandler: errorHandler,
 	})
 
@@ -53,7 +53,7 @@ func (s *Server) registerRoutes() {
 
 	// Health
 	api.Get("/health", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{"status": "ok", "service": "autopentest"})
+		return c.JSON(fiber.Map{"status": "ok", "service": "pentestswarm"})
 	})
 
 	// Campaigns

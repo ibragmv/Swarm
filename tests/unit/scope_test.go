@@ -3,8 +3,8 @@ package unit
 import (
 	"testing"
 
-	apperrors "github.com/Armur-Ai/autopentest/internal/errors"
-	"github.com/Armur-Ai/autopentest/internal/scope"
+	apperrors "github.com/Armur-Ai/Pentest-Swarm-AI/internal/errors"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/scope"
 )
 
 func TestValidate_InScopeIP(t *testing.T) {

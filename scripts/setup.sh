@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== autopentest development setup ==="
+echo "=== pentestswarm development setup ==="
 echo ""
 
 # Check prerequisites
@@ -25,17 +25,17 @@ for i in $(seq 1 30); do
     sleep 1
 done
 
-echo "[4/5] Building autopentest..."
+echo "[4/5] Building pentestswarm..."
 make build
 
 echo "[5/5] Running health check..."
-./bin/autopentest --version
+./bin/pentestswarm --version
 
 echo ""
 echo "=== Setup complete ==="
 echo ""
 echo "Services running:"
-echo "  PostgreSQL: localhost:5432 (user: autopentest, password: autopentest_dev)"
+echo "  PostgreSQL: localhost:5432 (user: pentestswarm, password: pentestswarm_dev)"
 echo "  Redis:      localhost:6379"
 echo "  Ollama:     localhost:11434"
 echo ""

@@ -5,7 +5,7 @@ import (
 	"math"
 	"strings"
 
-	"github.com/Armur-Ai/autopentest/internal/pipeline"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/pipeline"
 )
 
 // CVSSComponents holds parsed CVSS v3.1 vector components.

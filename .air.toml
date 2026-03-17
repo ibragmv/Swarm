@@ -2,8 +2,8 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
-  bin = "./bin/autopentest"
-  cmd = "go build -ldflags '-s -w' -o ./bin/autopentest ./cmd/autopentest/"
+  bin = "./bin/pentestswarm"
+  cmd = "go build -ldflags '-s -w' -o ./bin/pentestswarm ./cmd/pentestswarm/"
   delay = 1000
   exclude_dir = ["bin", "tmp", "vendor", "web", "node_modules", "data", "training", "legacy"]
   exclude_file = []

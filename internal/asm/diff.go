@@ -1,7 +1,7 @@
 package asm
 
 import (
-	"github.com/Armur-Ai/autopentest/internal/pipeline"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/pipeline"
 )
 
 // AssetDiff represents changes between two attack surface snapshots.

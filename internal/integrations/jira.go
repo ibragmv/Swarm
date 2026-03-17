@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Armur-Ai/autopentest/internal/pipeline"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/pipeline"
 )
 
 // JiraClient creates issues from findings.
@@ -38,11 +38,11 @@ func (j *JiraClient) CreateIssue(ctx context.Context, finding pipeline.Classifie
 	body := map[string]any{
 		"fields": map[string]any{
 			"project":     map[string]string{"key": j.project},
-			"summary":     fmt.Sprintf("[autopentest] %s", finding.Title),
+			"summary":     fmt.Sprintf("[pentestswarm] %s", finding.Title),
 			"description": formatJiraDescription(finding),
 			"issuetype":   map[string]string{"name": j.issueType},
 			"priority":    map[string]string{"name": priority},
-			"labels":      []string{"security", "autopentest", string(finding.Severity)},
+			"labels":      []string{"security", "pentestswarm", string(finding.Severity)},
 		},
 	}
 

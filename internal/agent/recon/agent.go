@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Armur-Ai/autopentest/internal/llm"
-	"github.com/Armur-Ai/autopentest/internal/pipeline"
-	"github.com/Armur-Ai/autopentest/internal/scope"
-	"github.com/Armur-Ai/autopentest/internal/tools"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/llm"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/pipeline"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/scope"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/tools"
 	"github.com/google/uuid"
 )
 

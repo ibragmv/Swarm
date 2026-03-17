@@ -3,7 +3,7 @@ package classifier
 import (
 	"strings"
 
-	"github.com/Armur-Ai/autopentest/internal/pipeline"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/pipeline"
 )
 
 // FPFilter scores the false positive probability of a finding.

@@ -3,7 +3,7 @@ package memory
 import (
 	"fmt"
 
-	"github.com/Armur-Ai/autopentest/internal/pipeline"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/pipeline"
 )
 
 // ExtractPatterns pulls anonymized patterns from a completed campaign.

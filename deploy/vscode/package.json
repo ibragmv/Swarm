@@ -1,13 +1,13 @@
 {
-  "name": "autopentest",
-  "displayName": "autopentest — AI Penetration Testing",
+  "name": "pentestswarm",
+  "displayName": "pentestswarm — AI Penetration Testing",
   "description": "Autonomous AI-powered penetration testing from your IDE. Scan targets, view findings inline, and generate reports.",
   "version": "0.1.0",
   "publisher": "armurai",
   "icon": "icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Armur-Ai/autopentest"
+    "url": "https://github.com/Armur-Ai/pentestswarm"
   },
   "engines": {
     "vscode": "^1.85.0"
@@ -15,65 +15,65 @@
   "categories": ["Testing", "Linters", "Other"],
   "keywords": ["security", "penetration-testing", "vulnerability", "scanner", "pentest", "ai"],
   "activationEvents": [
-    "onCommand:autopentest.scan",
-    "onCommand:autopentest.explain",
+    "onCommand:pentestswarm.scan",
+    "onCommand:pentestswarm.explain",
     "workspaceContains:config.yaml",
-    "workspaceContains:autopentest.yaml"
+    "workspaceContains:pentestswarm.yaml"
   ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "autopentest.scan",
-        "title": "AutoPentest: Scan Target",
-        "category": "AutoPentest"
+        "command": "pentestswarm.scan",
+        "title": "PentestSwarm: Scan Target",
+        "category": "PentestSwarm"
       },
       {
-        "command": "autopentest.explain",
-        "title": "AutoPentest: Explain Finding",
-        "category": "AutoPentest"
+        "command": "pentestswarm.explain",
+        "title": "PentestSwarm: Explain Finding",
+        "category": "PentestSwarm"
       },
       {
-        "command": "autopentest.stop",
-        "title": "AutoPentest: Stop Campaign",
-        "category": "AutoPentest"
+        "command": "pentestswarm.stop",
+        "title": "PentestSwarm: Stop Campaign",
+        "category": "PentestSwarm"
       },
       {
-        "command": "autopentest.viewReport",
-        "title": "AutoPentest: View Report",
-        "category": "AutoPentest"
+        "command": "pentestswarm.viewReport",
+        "title": "PentestSwarm: View Report",
+        "category": "PentestSwarm"
       }
     ],
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "autopentest",
-          "title": "AutoPentest",
+          "id": "pentestswarm",
+          "title": "PentestSwarm",
           "icon": "$(shield)"
         }
       ]
     },
     "views": {
-      "autopentest": [
+      "pentestswarm": [
         {
-          "id": "autopentest.findings",
+          "id": "pentestswarm.findings",
           "name": "Findings"
         },
         {
-          "id": "autopentest.campaigns",
+          "id": "pentestswarm.campaigns",
           "name": "Campaigns"
         }
       ]
     },
     "configuration": {
-      "title": "AutoPentest",
+      "title": "PentestSwarm",
       "properties": {
-        "autopentest.apiUrl": {
+        "pentestswarm.apiUrl": {
           "type": "string",
           "default": "http://localhost:8080",
-          "description": "URL of the autopentest API server"
+          "description": "URL of the pentestswarm API server"
         },
-        "autopentest.apiKey": {
+        "pentestswarm.apiKey": {
           "type": "string",
           "default": "",
           "description": "API key for authentication"

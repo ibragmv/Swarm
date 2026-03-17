@@ -3,37 +3,37 @@ import * as vscode from "vscode";
 let statusBarItem: vscode.StatusBarItem;
 
 export function activate(context: vscode.ExtensionContext) {
-  console.log("autopentest extension activated");
+  console.log("pentestswarm extension activated");
 
   // Status bar
   statusBarItem = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Left,
     100
   );
-  statusBarItem.text = "$(shield) autopentest";
-  statusBarItem.tooltip = "AutoPentest — AI Penetration Testing";
-  statusBarItem.command = "autopentest.scan";
+  statusBarItem.text = "$(shield) pentestswarm";
+  statusBarItem.tooltip = "PentestSwarm — AI Penetration Testing";
+  statusBarItem.command = "pentestswarm.scan";
   statusBarItem.show();
   context.subscriptions.push(statusBarItem);
 
   // Commands
   context.subscriptions.push(
-    vscode.commands.registerCommand("autopentest.scan", scanTarget),
-    vscode.commands.registerCommand("autopentest.explain", explainFinding),
-    vscode.commands.registerCommand("autopentest.stop", stopCampaign),
-    vscode.commands.registerCommand("autopentest.viewReport", viewReport)
+    vscode.commands.registerCommand("pentestswarm.scan", scanTarget),
+    vscode.commands.registerCommand("pentestswarm.explain", explainFinding),
+    vscode.commands.registerCommand("pentestswarm.stop", stopCampaign),
+    vscode.commands.registerCommand("pentestswarm.viewReport", viewReport)
   );
 
   // Findings tree view
   const findingsProvider = new FindingsTreeProvider();
   vscode.window.registerTreeDataProvider(
-    "autopentest.findings",
+    "pentestswarm.findings",
     findingsProvider
   );
 
   // Diagnostics collection (shows findings in Problems panel)
   const diagnosticCollection =
-    vscode.languages.createDiagnosticCollection("autopentest");
+    vscode.languages.createDiagnosticCollection("pentestswarm");
   context.subscriptions.push(diagnosticCollection);
 }
 
@@ -62,7 +62,7 @@ async function scanTarget() {
   statusBarItem.text = "$(loading~spin) Scanning...";
 
   try {
-    const config = vscode.workspace.getConfiguration("autopentest");
+    const config = vscode.workspace.getConfiguration("pentestswarm");
     const apiUrl = config.get<string>("apiUrl", "http://localhost:8080");
 
     const response = await fetch(`${apiUrl}/api/v1/campaigns`, {
@@ -90,9 +90,9 @@ async function scanTarget() {
     pollFindings(apiUrl, data.id);
   } catch (err) {
     vscode.window.showErrorMessage(
-      `Failed to start scan: ${err}. Is autopentest serve running?`
+      `Failed to start scan: ${err}. Is pentestswarm serve running?`
     );
-    statusBarItem.text = "$(shield) autopentest";
+    statusBarItem.text = "$(shield) pentestswarm";
   }
 }
 
@@ -104,7 +104,7 @@ async function explainFinding() {
 
   if (!findingId) return;
 
-  const config = vscode.workspace.getConfiguration("autopentest");
+  const config = vscode.workspace.getConfiguration("pentestswarm");
   const apiUrl = config.get<string>("apiUrl", "http://localhost:8080");
 
   try {
@@ -125,12 +125,12 @@ async function explainFinding() {
 
 async function stopCampaign() {
   vscode.window.showInformationMessage("Campaign stopped.");
-  statusBarItem.text = "$(shield) autopentest";
+  statusBarItem.text = "$(shield) pentestswarm";
 }
 
 async function viewReport() {
   vscode.window.showInformationMessage(
-    "Report viewer: run autopentest campaign report <id>"
+    "Report viewer: run pentestswarm campaign report <id>"
   );
 }
 
@@ -138,7 +138,7 @@ async function viewReport() {
 
 async function pollFindings(apiUrl: string, campaignId: string) {
   const diagnosticCollection =
-    vscode.languages.createDiagnosticCollection("autopentest");
+    vscode.languages.createDiagnosticCollection("pentestswarm");
 
   // Poll every 10 seconds for new findings
   const interval = setInterval(async () => {
@@ -165,11 +165,11 @@ async function pollFindings(apiUrl: string, campaignId: string) {
             `[${finding.severity.toUpperCase()}] ${finding.title}: ${finding.description}`,
             severity
           );
-          diag.source = "autopentest";
+          diag.source = "pentestswarm";
           return diag;
         });
 
-        const uri = vscode.Uri.parse(`autopentest://${campaignId}`);
+        const uri = vscode.Uri.parse(`pentestswarm://${campaignId}`);
         diagnosticCollection.set(uri, diagnostics);
 
         statusBarItem.text = `$(shield) ${data.data.length} findings`;
@@ -186,7 +186,7 @@ async function pollFindings(apiUrl: string, campaignId: string) {
         statusData.status === "aborted"
       ) {
         clearInterval(interval);
-        statusBarItem.text = "$(shield) autopentest";
+        statusBarItem.text = "$(shield) pentestswarm";
         vscode.window.showInformationMessage(
           `Campaign ${statusData.status}. ${data.data?.length || 0} findings.`
         );

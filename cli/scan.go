@@ -11,10 +11,10 @@ var scanCmd = &cobra.Command{
 	Short: "Start a penetration test against a target",
 	Long:  `Starts an autonomous penetration testing campaign against the specified target.`,
 	Args:  cobra.ExactArgs(1),
-	Example: `  autopentest scan example.com --scope example.com
-  autopentest scan 10.0.0.0/24 --scope 10.0.0.0/24 --objective "find RCE"
-  autopentest scan example.com --scope example.com --mode bugbounty --follow
-  autopentest scan example.com --scope example.com --dry-run`,
+	Example: `  pentestswarm scan example.com --scope example.com
+  pentestswarm scan 10.0.0.0/24 --scope 10.0.0.0/24 --objective "find RCE"
+  pentestswarm scan example.com --scope example.com --mode bugbounty --follow
+  pentestswarm scan example.com --scope example.com --dry-run`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		target := args[0]
 
@@ -45,7 +45,7 @@ var scanCmd = &cobra.Command{
 		_ = follow
 		_ = output
 
-		fmt.Println("\n✅ Campaign created. Use 'autopentest campaign watch <id>' to monitor.")
+		fmt.Println("\n✅ Campaign created. Use 'pentestswarm campaign watch <id>' to monitor.")
 		return nil
 	},
 }

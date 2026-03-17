@@ -175,8 +175,8 @@ func Load(path string) (*Config, error) {
 	v.SetDefault("server.port", 8080)
 	v.SetDefault("database.host", "localhost")
 	v.SetDefault("database.port", 5432)
-	v.SetDefault("database.user", "autopentest")
-	v.SetDefault("database.name", "autopentest")
+	v.SetDefault("database.user", "pentestswarm")
+	v.SetDefault("database.name", "pentestswarm")
 	v.SetDefault("database.sslmode", "disable")
 	v.SetDefault("redis.host", "localhost")
 	v.SetDefault("redis.port", 6379)
@@ -219,12 +219,12 @@ func Load(path string) (*Config, error) {
 	v.SetDefault("intelligence.enabled", false)
 	v.SetDefault("intelligence.share_patterns", false)
 	v.SetDefault("intelligence.consume_patterns", false)
-	v.SetDefault("intelligence.api_endpoint", "https://api.autopentest.ai")
+	v.SetDefault("intelligence.api_endpoint", "https://api.pentestswarm.ai")
 	v.SetDefault("logging.level", "info")
 	v.SetDefault("logging.format", "console")
 
-	// Environment variable overrides: AUTOPENTEST_SERVER_PORT, etc.
-	v.SetEnvPrefix("AUTOPENTEST")
+	// Environment variable overrides: PENTESTSWARM_SERVER_PORT, etc.
+	v.SetEnvPrefix("PENTESTSWARM")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
 
@@ -235,8 +235,8 @@ func Load(path string) (*Config, error) {
 		v.SetConfigName("config")
 		v.SetConfigType("yaml")
 		v.AddConfigPath(".")
-		v.AddConfigPath("$HOME/.autopentest")
-		v.AddConfigPath("/etc/autopentest")
+		v.AddConfigPath("$HOME/.pentestswarm")
+		v.AddConfigPath("/etc/pentestswarm")
 	}
 
 	if err := v.ReadInConfig(); err != nil {

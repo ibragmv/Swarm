@@ -40,7 +40,7 @@ export default function DashboardPage() {
             <p className="text-sm mt-2">
               Run{" "}
               <code className="bg-background px-2 py-1 rounded text-accent">
-                autopentest scan target.com --scope target.com
+                pentestswarm scan target.com --scope target.com
               </code>
             </p>
           </div>

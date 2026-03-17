@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Armur-Ai/autopentest/internal/scope"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/scope"
 )
 
 // SubfinderTool wraps subfinder for passive subdomain discovery.

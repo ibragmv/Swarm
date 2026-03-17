@@ -10,10 +10,10 @@ var explainCmd = &cobra.Command{
 	Use:   "explain <finding-id|cve-id>",
 	Short: "Explain a finding or CVE in plain English",
 	Args:  cobra.ExactArgs(1),
-	Example: `  autopentest explain abc-123
-  autopentest explain CVE-2024-1234
-  autopentest explain abc-123 --audience developer
-  autopentest explain abc-123 --remediate`,
+	Example: `  pentestswarm explain abc-123
+  pentestswarm explain CVE-2024-1234
+  pentestswarm explain abc-123 --audience developer
+  pentestswarm explain abc-123 --remediate`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		id := args[0]
 		audience, _ := cmd.Flags().GetString("audience")

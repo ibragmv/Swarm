@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Armur-Ai/autopentest/internal/scope"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/scope"
 )
 
 // KatanaTool wraps katana for web crawling and endpoint discovery.

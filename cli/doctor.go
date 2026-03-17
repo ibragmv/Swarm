@@ -14,9 +14,9 @@ var doctorCmd = &cobra.Command{
 	Use:   "doctor",
 	Short: "Check system health and dependencies",
 	Long:  "Runs a 10-point health check to verify all dependencies are available.",
-	Example: "  autopentest doctor",
+	Example: "  pentestswarm doctor",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("🔍 autopentest doctor — checking system health")
+		fmt.Println("🔍 pentestswarm doctor — checking system health")
 		fmt.Println()
 
 		checks := []struct {
@@ -52,7 +52,7 @@ var doctorCmd = &cobra.Command{
 func checkAPI() (string, bool) {
 	conn, err := net.DialTimeout("tcp", "localhost:8080", 2*time.Second)
 	if err != nil {
-		return "not reachable at localhost:8080 — run 'autopentest serve'", false
+		return "not reachable at localhost:8080 — run 'pentestswarm serve'", false
 	}
 	conn.Close()
 	return "listening on :8080", true

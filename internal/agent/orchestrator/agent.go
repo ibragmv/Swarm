@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Armur-Ai/autopentest/internal/llm"
-	"github.com/Armur-Ai/autopentest/internal/pipeline"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/llm"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/pipeline"
 )
 
 // OrchestratorAgent coordinates all specialist agents using a ReAct loop.

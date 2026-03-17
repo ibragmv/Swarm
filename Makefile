@@ -5,17 +5,17 @@ COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "none")
 DATE    ?= $(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
 LDFLAGS  = -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)
 
-## build: Compile binary to ./bin/autopentest
+## build: Compile binary to ./bin/pentestswarm
 build:
 	@mkdir -p bin
-	go build -ldflags "$(LDFLAGS)" -o bin/autopentest ./cmd/autopentest/
+	go build -ldflags "$(LDFLAGS)" -o bin/pentestswarm ./cmd/pentestswarm/
 
 ## dev: Start full local development stack
 dev: build
 	@echo "Starting development environment..."
 	docker compose -f deploy/docker-compose.dev.yml up -d
-	@echo "Running autopentest..."
-	./bin/autopentest
+	@echo "Running pentestswarm..."
+	./bin/pentestswarm
 
 ## test: Run unit tests with race detector
 test:
@@ -42,7 +42,7 @@ lint:
 ## fmt: Format code with gofmt and goimports
 fmt:
 	gofmt -s -w .
-	goimports -w -local github.com/Armur-Ai/autopentest .
+	goimports -w -local github.com/Armur-Ai/Pentest-Swarm-AI .
 
 ## generate: Run code generation (sqlc, etc.)
 generate:

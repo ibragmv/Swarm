@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "autopentest — AI Penetration Testing Dashboard",
+  title: "pentestswarm — AI Penetration Testing Dashboard",
   description: "Autonomous AI-powered penetration testing platform",
 };
 
@@ -18,7 +18,7 @@ export default function RootLayout({
           {/* Sidebar */}
           <aside className="w-64 bg-surface border-r border-border flex flex-col">
             <div className="p-4 border-b border-border">
-              <h1 className="text-lg font-bold text-accent">autopentest</h1>
+              <h1 className="text-lg font-bold text-accent">pentestswarm</h1>
               <p className="text-xs text-gray-500 mt-1">AI Penetration Testing</p>
             </div>
             <nav className="flex-1 p-3 space-y-1">
