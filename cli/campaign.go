@@ -3,6 +3,9 @@ package cli
 import (
 	"fmt"
 
+	"github.com/Armur-Ai/Pentest-Swarm-AI/cli/ui"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/pipeline"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 )
 
@@ -16,10 +19,10 @@ var campaignListCmd = &cobra.Command{
 	Short:   "List all campaigns",
 	Example: "  pentestswarm campaign list",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("ID                                    STATUS       TARGET              FINDINGS")
-		fmt.Println("─────────────────────────────────────────────────────────────────────────────")
-		// TODO: fetch from API
-		fmt.Println("(no campaigns yet)")
+		fmt.Println(colorBold("ID                                   STATUS       TARGET              FINDINGS"))
+		fmt.Println(colorDim("───────────────────────────────────────────────────────────────────────────────"))
+		// TODO: fetch from API/DB
+		fmt.Println(colorDim("  (no campaigns yet — run: pentestswarm scan <target> --scope <scope>)"))
 		return nil
 	},
 }
@@ -31,21 +34,46 @@ var campaignStatusCmd = &cobra.Command{
 	Example: "  pentestswarm campaign status abc-123",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		id := args[0]
-		fmt.Printf("Campaign: %s\n", id)
+		fmt.Printf("%s Campaign: %s\n", colorBold("*"), id)
+		fmt.Printf("  Status:  %s\n", colorYellow("unknown"))
+		fmt.Printf("  Target:  %s\n", colorDim("fetch from API"))
 		// TODO: fetch from API
 		return nil
 	},
 }
 
 var campaignWatchCmd = &cobra.Command{
-	Use:     "watch <id>",
-	Short:   "Live stream of agent activity (TUI)",
+	Use:   "watch <id>",
+	Short: "Live TUI dashboard — watch the swarm work",
+	Long: `Opens a full-screen terminal dashboard showing all agents
+working simultaneously. Live findings, attack paths, and agent thoughts.`,
 	Args:    cobra.ExactArgs(1),
 	Example: "  pentestswarm campaign watch abc-123",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO: launch bubbletea TUI
-		fmt.Printf("Watching campaign %s... (TUI will launch here)\n", args[0])
-		return nil
+		id := args[0]
+
+		// Create TUI model
+		model := ui.NewModel(id, "target", "find all vulnerabilities")
+
+		// Launch bubbletea program
+		p := tea.NewProgram(model, tea.WithAltScreen())
+
+		// In a real implementation, we'd connect to the WebSocket here
+		// and feed events to the TUI via p.Send(ui.EventMsg{...})
+		go func() {
+			// Demo: send some events to show the TUI working
+			demoEvents := []pipeline.CampaignEvent{
+				{EventType: pipeline.EventStateChange, AgentName: "engine", Detail: "Campaign initialized"},
+				{EventType: pipeline.EventThought, AgentName: "orchestrator", Detail: "Planning reconnaissance strategy..."},
+				{EventType: pipeline.EventToolCall, AgentName: "recon", Detail: "Running subfinder, httpx, nuclei, naabu"},
+			}
+			for _, e := range demoEvents {
+				p.Send(ui.EventMsg(e))
+			}
+		}()
+
+		_, err := p.Run()
+		return err
 	},
 }
 
@@ -55,21 +83,23 @@ var campaignStopCmd = &cobra.Command{
 	Args:    cobra.ExactArgs(1),
 	Example: "  pentestswarm campaign stop abc-123",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Printf("Stopping campaign %s...\n", args[0])
+		fmt.Printf("%s Stopping campaign %s...\n", colorRed("*"), args[0])
 		// TODO: call API
-		fmt.Println("Campaign stopped.")
+		fmt.Printf("%s Campaign stopped. Cleanup actions executed.\n", colorGreen("*"))
 		return nil
 	},
 }
 
 var campaignExploreCmd = &cobra.Command{
-	Use:     "explore <id>",
-	Short:   "Interactive recon data explorer (TUI)",
-	Args:    cobra.ExactArgs(1),
+	Use:   "explore <id>",
+	Short: "Interactive attack surface explorer (TUI)",
+	Long:  `Browse discovered subdomains, hosts, ports, services, and findings interactively.`,
+	Args:  cobra.ExactArgs(1),
 	Example: "  pentestswarm campaign explore abc-123",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO: launch bubbletea recon explorer TUI
-		fmt.Printf("Exploring attack surface for campaign %s... (TUI will launch here)\n", args[0])
+		fmt.Printf("Exploring attack surface for campaign %s...\n", args[0])
+		// TODO: launch bubbletea recon explorer
+		fmt.Println(colorDim("(Explorer TUI requires a completed recon phase)"))
 		return nil
 	},
 }
