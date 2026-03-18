@@ -7,10 +7,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/api/ws"
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/config"
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/engine"
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/models"
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/pipeline"
+	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
@@ -25,6 +27,7 @@ type Server struct {
 	cfg       *config.Config
 	runner    *engine.Runner
 	campaigns sync.Map // id -> CampaignState
+	hub       *ws.EventHub
 }
 
 // CampaignState holds in-memory state for a running campaign.
@@ -65,6 +68,7 @@ func NewServer(port int, cfg *config.Config) *Server {
 		port:   port,
 		cfg:    cfg,
 		runner: engine.NewRunner(cfg),
+		hub:    ws.NewEventHub(),
 	}
 	s.registerRoutes()
 
@@ -92,7 +96,8 @@ func (s *Server) registerRoutes() {
 	api.Post("/campaigns/:id/start", s.startCampaign)
 	api.Post("/campaigns/:id/stop", s.stopCampaign)
 	api.Get("/campaigns/:id/findings", s.getCampaignFindings)
-	api.Get("/campaigns/:id/events", s.getCampaignEvents)
+	api.Get("/campaigns/:id/events", s.getCampaignEvents)       // HTTP polling
+	api.Get("/campaigns/:id/ws", websocket.New(s.handleWebSocket)) // WebSocket
 
 	api.Get("/models", s.listModels)
 	api.Get("/stats", s.getStats)
@@ -224,6 +229,7 @@ func (s *Server) startCampaign(c *fiber.Ctx) error {
 	}
 
 	// Run campaign in background
+	campaignIDStr := id
 	go func() {
 		s.runner.Run(ctx, cc, func(event pipeline.CampaignEvent) {
 			state.Events = append(state.Events, event)
@@ -242,6 +248,9 @@ func (s *Server) startCampaign(c *fiber.Ctx) error {
 					state.Campaign.Status = pipeline.StatusComplete
 				}
 			}
+
+			// Publish to WebSocket subscribers
+			s.hub.Publish(campaignIDStr, event)
 		})
 	}()
 
@@ -324,6 +333,23 @@ func (s *Server) getStats(c *fiber.Ctx) error {
 		"active_campaigns": active,
 		"total_findings":   totalFindings,
 	})
+}
+
+// --- WebSocket ---
+
+func (s *Server) handleWebSocket(c *websocket.Conn) {
+	campaignID := c.Params("id")
+
+	s.hub.Subscribe(campaignID, c.Conn)
+	defer s.hub.Unsubscribe(campaignID, c.Conn)
+
+	// Keep connection alive — read messages (client can send "ping")
+	for {
+		_, _, err := c.ReadMessage()
+		if err != nil {
+			break
+		}
+	}
 }
 
 // --- Error Handling ---
