@@ -63,7 +63,7 @@ export const api = {
 };
 
 export function connectWebSocket(campaignId: string, onEvent: (event: CampaignEvent) => void): WebSocket {
-  const wsUrl = API_BASE.replace("http", "ws") + `/campaigns/${campaignId}/events`;
+  const wsUrl = API_BASE.replace("http", "ws") + `/campaigns/${campaignId}/ws`;
   const ws = new WebSocket(wsUrl);
 
   ws.onmessage = (msg) => {
