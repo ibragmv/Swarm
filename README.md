@@ -1,4 +1,5 @@
-> **Standing on the shoulders of giants.** This project is inspired by the open-source AI pentesting community. We credit and thank these projects for pioneering the direction:
+> ### Inspiration & Direction
+> This project stands on the shoulders of giants. We credit and thank these projects for pioneering AI-powered offensive security:
 >
 > - [**PentestGPT**](https://github.com/GreyDGL/PentestGPT) — the OG that proved LLMs can pentest
 > - [**PentAGI**](https://github.com/vxcontrol/pentagi) — fully autonomous agent architecture
