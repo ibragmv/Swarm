@@ -1,4 +1,4 @@
-> ### Inspiration & Direction
+> ### Credits & Inspiration
 > This project stands on the shoulders of giants. We credit and thank these projects for pioneering AI-powered offensive security:
 >
 > - [**PentestGPT**](https://github.com/GreyDGL/PentestGPT) — the OG that proved LLMs can pentest
