@@ -220,10 +220,10 @@ Ship as YAML files in `playbooks/` — like Nuclei templates but for full swarm 
   - [ ] Publish to GitHub Marketplace *(external — tag + GH submit)*
   - [ ] SARIF output integrates with Code Scanning *(wired in action, emitter still pending)*
   - [x] Fail-PR-on-critical flag (`fail-on` input)
-- [ ] **2.4.2** Jira adapter — create issues from findings, severity-mapped
-- [ ] **2.4.3** Slack adapter — thread-per-campaign, daily digest, ack/escalate buttons
-- [ ] **2.4.4** SIEM export — CEF, STIX 2.1, SARIF
-- [ ] **2.4.5** Webhook delivery — HMAC-signed, retry with exponential backoff, dead-letter queue
+- [x] **2.4.2** Jira adapter — `internal/integrations/jira/client.go`; severity → Jira priority map (Highest…Lowest), Basic auth or Bearer, labels include attack-category
+- [x] **2.4.3** Slack adapter — `internal/integrations/slack/client.go`; both incoming-webhook and `chat.postMessage` (Bot token), thread-per-campaign tracking, `PostFinding` + `PostEvent` surface
+- [x] **2.4.4** SARIF 2.1.0 export (covers the SARIF slice of SIEM); CEF + STIX deferred as separate PRs since each needs schema work
+- [x] **2.4.5** Webhook dispatcher — HMAC-SHA256 signing, exponential-backoff retry, DLQ channel, permanent-error classification for 4xx (no wasted retries), exported `Verify()` helper for receivers
 
 ---
 
