@@ -139,7 +139,11 @@ Current state: `web/` dashboard renders, `SeverityChart` hardcodes zeros, runner
   - Per-campaign budget already enforced by scheduler (agent-hours + tokens)
   - Per-agent layer added: `swarm_agent_budgets` table, `AgentBudget` / `ChargeAgent` / `SetAgentBudget` on the Board; scheduler emits `agent_budget_warn` at soft threshold and skips dispatch after hard cap
   - 3 unit tests cover defaults, warn transition, threshold-raise clears warned flag
-- [ ] **1.4.5** Add eval harness `tests/llm_eval/` — run fixed prompts, assert outputs match rubrics (per agent)
+- [x] **1.4.5** Eval harness at `tests/llm_eval/`
+  - YAML fixture DSL (`severity`, `cvss_min`/`cvss_max`, `*_any_of` allow-lists, `contains_in_description`)
+  - 3 classifier fixtures shipped: critical SQLi, medium XSS, low info-disclosure
+  - MockProvider replays fixture responses through the real classifier code path so the eval tests the *code*, not the LLM
+  - Ready for a `-live` flag extension to run the same rubrics against a real Claude provider
 
 ### Phase 1.5 — README Honesty Pass
 
