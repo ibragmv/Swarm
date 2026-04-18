@@ -13,6 +13,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/trending"><img src="https://img.shields.io/badge/GitHub-Trending-ef4444?style=for-the-badge&logo=github&logoColor=white" alt="Trending on GitHub"></a>
   <img src="https://img.shields.io/github/stars/Armur-Ai/Pentest-Swarm-AI?style=for-the-badge&color=f59e0b" alt="Stars">
   <img src="https://img.shields.io/badge/Go-1.24-00ADD8?style=for-the-badge&logo=go" alt="Go">
   <img src="https://img.shields.io/badge/License-Apache%202.0-blue?style=for-the-badge" alt="License">
