@@ -13,19 +13,19 @@
 </p>
 
 <p align="center">
-  <img src="docs/demo.gif" alt="Pentest Swarm AI — CLI demo" width="900">
-</p>
-
-<p align="center">
-  <img src="banner/pentest-swarm-ai-banner.gif?v=3" alt="Pentest Swarm AI architecture" width="800">
-</p>
-
-<p align="center">
   <img src="https://img.shields.io/github/stars/Armur-Ai/Pentest-Swarm-AI?style=for-the-badge&color=f59e0b" alt="Stars">
   <img src="https://img.shields.io/badge/Go-1.24-00ADD8?style=for-the-badge&logo=go" alt="Go">
   <img src="https://img.shields.io/badge/License-Apache%202.0-blue?style=for-the-badge" alt="License">
   <img src="https://img.shields.io/badge/AI-Claude%20%7C%20Ollama-purple?style=for-the-badge" alt="AI">
   <img src="https://img.shields.io/badge/status-alpha-orange?style=for-the-badge" alt="Status">
+</p>
+
+<p align="center">
+  <img src="docs/demo.gif" alt="Pentest Swarm AI — CLI demo" width="900">
+</p>
+
+<p align="center">
+  <img src="banner/pentest-swarm-ai-banner.gif?v=3" alt="Pentest Swarm AI architecture" width="800">
 </p>
 
 > ### Credits & Inspiration
