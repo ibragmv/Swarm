@@ -22,15 +22,19 @@
 <p align="center">
   <h1 align="center">Pentest Swarm AI</h1>
   <p align="center">
-    <strong>Unleash a swarm of AI agents to autonomously pentest your software</strong>
+    <strong>The first open-source pentesting tool built on a real swarm — not just multiple agents in a row.</strong>
   </p>
   <p align="center">
     <a href="#quick-start">Quick Start</a> &middot;
+    <a href="#what-makes-this-a-swarm">Swarm vs. Multi-Agent</a> &middot;
     <a href="#how-the-swarm-works">How It Works</a> &middot;
-    <a href="#features">Features</a> &middot;
-    <a href="PLAN.md">Architecture</a> &middot;
-    <a href="#contributing">Contributing</a>
+    <a href="#comparison">Compare</a> &middot;
+    <a href="IMPLEMENTATION_PLAN.md">Roadmap</a>
   </p>
+</p>
+
+<p align="center">
+  <img src="docs/demo.gif" alt="Pentest Swarm AI — CLI demo" width="900">
 </p>
 
 <p align="center">
@@ -38,18 +42,24 @@
   <img src="https://img.shields.io/badge/Go-1.24-00ADD8?style=for-the-badge&logo=go" alt="Go">
   <img src="https://img.shields.io/badge/License-Apache%202.0-blue?style=for-the-badge" alt="License">
   <img src="https://img.shields.io/badge/AI-Claude%20%7C%20Ollama-purple?style=for-the-badge" alt="AI">
+  <img src="https://img.shields.io/badge/status-alpha-orange?style=for-the-badge" alt="Status">
 </p>
 
 ---
 
-**Pentest Swarm AI** is a Go-native platform that deploys a coordinated swarm of specialist AI agents to autonomously perform full-cycle penetration tests. Each agent is purpose-built for a specific phase — recon, classification, exploitation, reporting — and the swarm orchestrator coordinates them in real-time using a ReAct reasoning loop.
+## What makes this a swarm?
 
-One command. One API key. A full pentest report.
+Most "multi-agent" pentesting tools are a single planner LLM dispatching to specialist agents in a fixed order — recon → classify → exploit → report. That's a **pipeline**, not a swarm.
 
-```bash
-export PENTESTSWARM_ORCHESTRATOR_API_KEY=sk-ant-your-key-here
-pentestswarm scan target.com --scope target.com
-```
+Pentest Swarm AI is built around three swarm-intelligence primitives:
+
+- **Stigmergy** — agents coordinate by reading and writing findings on a shared blackboard, not by a central planner telling them what to do. A finding's *pheromone weight* biases other agents toward it and decays over time, so stale paths die naturally.
+- **Emergence** — attack chains appear that no single agent planned. A recon finding wakes the classifier; a high-severity classification wakes the exploit agent; exploit results feed back into the board and wake the report agent. Order isn't prescribed — it emerges from the blackboard state.
+- **Decentralization** — each agent runs its own *trigger predicate*. Add a new agent with its own predicate and it joins the swarm without anyone rewriting the orchestrator.
+
+We built this because the category was empty. Every tool marketed as "swarm" was actually a pipeline. If you find a counter-example, open an issue — we'll add them to the [comparison table](#comparison).
+
+See [**IMPLEMENTATION_PLAN.md**](IMPLEMENTATION_PLAN.md) for the technical deep-dive on stigmergy, pheromone decay, the Postgres-backed blackboard, and why we didn't build on Google ADK / CrewAI / AutoGen.
 
 ---
 
@@ -57,115 +67,128 @@ pentestswarm scan target.com --scope target.com
 
 ```bash
 # Install (pick one)
-brew install armur-ai/tap/pentestswarm           # macOS
-curl -sSL https://install.pentestswarm.ai | sh    # Linux
-docker compose -f deploy/docker-compose.yml up     # Docker
+brew install Armur-Ai/tap/pentestswarm            # macOS (Homebrew tap)
+docker run --rm -e ANTHROPIC_API_KEY=sk-ant-... \
+  ghcr.io/armur-ai/pentestswarm:latest \
+  scan example.com --scope example.com             # Docker one-liner
 go install github.com/Armur-Ai/Pentest-Swarm-AI/cmd/pentestswarm@latest  # Go
 
-# Set your Claude API key (that's the only config needed)
+# One API key, one command, one swarm.
 export PENTESTSWARM_ORCHESTRATOR_API_KEY=sk-ant-your-key-here
-
-# Launch the swarm
-pentestswarm scan example.com --scope example.com --follow
+pentestswarm scan example.com --scope example.com --swarm --follow
 ```
 
-No Ollama. No model downloads. No GPU. Just a Claude API key and you're pentesting.
+That's the whole setup. No Ollama, no model download, no GPU — just a Claude API key.
+
+Running inside a GitHub Actions workflow? There's an action for that — see [`deploy/github-action/example-workflow.yml`](deploy/github-action/example-workflow.yml).
 
 ---
 
-## How the Swarm Works
+## How the swarm works
 
 ```
-                        YOU
-                         |
-                  pentestswarm scan target.com
-                         |
-              ┌──────────▼──────────┐
-              │   SWARM ORCHESTRATOR │
-              │   (ReAct Loop)       │
-              │   Plans · Adapts ·   │
-              │   Coordinates        │
-              └──┬───┬───┬───┬──────┘
-                 │   │   │   │
-        ┌────────┘   │   │   └────────┐
-        ▼            ▼   ▼            ▼
-   ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐
-   │  RECON  │ │CLASSIFY │ │ EXPLOIT │ │ REPORT  │
-   │  AGENT  │ │  AGENT  │ │  AGENT  │ │  AGENT  │
-   │         │ │         │ │         │ │         │
-   │subfinder│ │CVE map  │ │Attack   │ │PDF/HTML │
-   │httpx    │ │CVSS 3.1 │ │chains   │ │Markdown │
-   │nuclei   │ │FP filter│ │MITRE    │ │JSON     │
-   │naabu    │ │severity │ │ATT&CK   │ │exec     │
-   │katana   │ │ranking  │ │dry-run  │ │summary  │
-   │dnsx/gau │ │         │ │cleanup  │ │         │
-   └─────────┘ └─────────┘ └─────────┘ └─────────┘
+                         YOU
+                          |
+                   pentestswarm scan example.com --swarm
+                          |
+               ┌──────────▼──────────┐
+               │   SEED: TARGET_REG  │
+               └──────────┬──────────┘
+                          ▼
+     ┌────────────────────────────────────────────────────────┐
+     │              SHARED BLACKBOARD (pgvector)              │
+     │                                                        │
+     │   SUBDOMAIN · PORT_OPEN · HTTP_ENDPOINT · TECHNOLOGY   │
+     │   CVE_MATCH · MISCONFIGURATION · EXPLOIT_CHAIN         │
+     │   EXPLOIT_RESULT · CAMPAIGN_COMPLETE                   │
+     │                                                        │
+     │   (each finding has a pheromone weight that decays)    │
+     └──┬─────────────┬─────────────┬─────────────┬───────────┘
+        │             │             │             │
+        │ triggers:   │ triggers:   │ triggers:   │ triggers:
+        │ TARGET_REG  │ raw recon + │ CVE_MATCH   │ CAMPAIGN_
+        │             │ pheromone>  │ pheromone>  │ COMPLETE
+        │             │ 0.2         │ 0.5         │
+        ▼             ▼             ▼             ▼
+   ┌─────────┐  ┌─────────┐   ┌─────────┐   ┌─────────┐
+   │  RECON  │  │CLASSIFY │   │ EXPLOIT │   │ REPORT  │
+   │         │  │         │   │         │   │         │
+   │ runs 8  │  │ maps    │   │ builds  │   │ queries │
+   │ tools,  │  │ CVEs,   │   │ attack  │   │ board   │
+   │ writes  │  │ scores  │   │ chains  │   │ →md/    │
+   │ per     │  │ CVSS,   │   │ per     │   │ html/   │
+   │ finding │  │ writes  │   │ finding │   │ json/   │
+   └─────────┘  └─────────┘   └─────────┘   │ sarif   │
+                                            └─────────┘
 ```
 
-The swarm orchestrator **thinks, plans, and adapts** in real-time:
+Key behaviours:
 
-1. Deploys the **Recon Agent** — runs 7 security tools natively in Go, builds a structured attack surface
-2. Sends findings to the **Classifier Agent** — maps CVEs, scores CVSS v3.1, filters false positives
-3. The **Exploit Agent** constructs multi-step attack chains with chain-of-thought reasoning
-4. Orchestrator executes steps, adapts the plan based on results, pivots when paths fail
-5. The **Report Agent** generates a professional pentest report (PDF/HTML/Markdown)
-
-Every tool execution is scope-validated. Every exploitation step has a registered cleanup command. Emergency stop kills the swarm in under 5 seconds.
+1. **Agents are independent.** Any one of them can be removed, replaced, or added without rewiring the others.
+2. **Pheromones decay per-finding-type.** A `PORT_OPEN` stays hot for hours; a `SESSION` for minutes. Config-driven half-lives.
+3. **Scope is enforced at the tool layer and again at the executor.** Defence in depth — `--scope` is not bypassable.
+4. **Cleanup is always registered before execution.** SIGINT, crashes, and budget exhaustion all trigger reverse-order cleanup. See `internal/pipeline/cleanup_memory.go` and `cleanup.go`.
+5. **Prompt caching on Claude** cuts cost and latency on repeated system prompts (enabled by default for recon + classifier).
 
 ---
 
-## Features
+## Comparison
 
-### The Swarm
-- **5-agent architecture** — Orchestrator + 4 specialists, each purpose-built
-- **7 native Go security tools** — subfinder, httpx, nuclei, naabu, katana, dnsx, gau (no subprocess overhead)
-- **ReAct orchestration** — reason, act, observe, adapt in real-time
-- **CVSS v3.1 scoring** — exact FIRST specification with context adjustment
-- **Scope enforcement** — hard-coded on every command, no exceptions
-- **Campaign state machine** — full lifecycle with emergency stop
+How we position vs. the rest of the ecosystem. We'll ship real benchmark numbers in a future release (see [Phase 3.3](IMPLEMENTATION_PLAN.md#phase-33--benchmarks-the-credibility-lever)).
 
-### Modes
-| Mode | What it does |
-|------|-------------|
-| `--mode manual` | Full autonomous pentest with human oversight |
-| `--mode bugbounty` | Imports H1/Bugcrowd scope, deduplicates, formats program-compliant reports |
-| `--mode asm` | Continuous attack surface monitoring, auto-triggers on new assets |
-| `--mode ctf` | Autonomous HackTheBox/TryHackMe machine solving |
+| Tool | Architecture | Executes vs. suggests | Memory | Tools wired | MCP | Swarm? |
+|---|---|---|---|---|---|---|
+| **Pentest Swarm AI** | Stigmergic blackboard | Executes | pgvector + pheromones | 8 ProjectDiscovery + nmap; sqlmap / Burp MCP / Metasploit in roadmap | Yes | ✅ real |
+| PentestGPT | Single-agent ReAct | Suggests | None | None native | No | No |
+| HackingBuddyGPT | Single-agent | Executes | Run logs | Shell passthrough | No | No |
+| PentAGI | 4 agents + planner | Executes | pgvector | 40+ via MCP/shell | Partial | Pipeline |
+| Shannon | White-box + browser | Executes | Session state | Browser DOM | No | Pipeline |
+| HexStrike | MCP tool wrapper | Delegates to client LLM | None (stateless) | 150+ via MCP | Yes | No |
+| Pentest-R1 | RL-tuned LLM | Executes | Trajectory | CTF-scope | No | No |
 
-### Integrations
-- **MCP Server** — `pentestswarm mcp serve` exposes the swarm to Claude Desktop, Cursor, any MCP client
-- **VS Code Extension** — findings inline in your IDE, scan from command palette
-- **GitHub Action** — SARIF output, findings in GitHub Security tab, fail PRs on critical vulns
-- **Jira** — auto-create issues with severity-mapped priorities
-- **Slack** — real-time alerts, thread-per-campaign, daily digest
-- **SIEM** — CEF, STIX 2.1, SARIF output for ArcSight/Splunk/QRadar
-- **Webhooks** — HMAC-signed event delivery with retry
+If any entry here is wrong or out of date, please open a PR — we want this table to stay honest.
 
-### Ecosystem
-- **Community Playbooks** — YAML attack playbooks (like nuclei-templates but for full attack chains)
-- **Agent Memory** — the swarm gets smarter with every scan
-- **Shared Intelligence** — opt-in anonymized pattern sharing across installations
-- **Plugin System** — custom tools, report templates, and playbooks
+---
 
-### Dashboard & TUI
-- **Next.js 15 dashboard** — dark theme, live attack surface graph, agent activity monitor, attack path DAG, real-time metrics
-- **Terminal TUI** — multi-panel view showing all agents working simultaneously, attack paths, findings histogram
-- **Interactive Explorer** — browse the attack surface in your terminal with search and filter
+## Feature status
+
+Honesty labels: *stable* means shipped + tested, *beta* means works but rough edges, *alpha* means experimental, *planned* means in the [roadmap](IMPLEMENTATION_PLAN.md).
+
+| Feature | Status | Notes |
+|---|---|---|
+| Sequential 5-phase runner | **stable** | Default mode; battle-tested core |
+| Stigmergic swarm scheduler | **alpha** | `--swarm` flag; memory-backed blackboard wired |
+| ProjectDiscovery toolchain | **stable** | subfinder, httpx, nuclei, naabu, katana, dnsx, gau |
+| `nmap` adapter | **stable** | XML parsed; scope-validated |
+| Cleanup registry | **stable** | Always runs on SIGINT / exit / budget-cancel |
+| Claude prompt caching | **stable** | Enabled for recon + classifier by default |
+| `--strict` LLM mode | **stable** | Promotes LLM errors to fatal |
+| CVSS v3.1 scoring | **stable** | FIRST spec |
+| Postgres blackboard backend | **beta** | Migration shipped; runner uses memory-board for now |
+| MCP server | **beta** | `pentestswarm mcp serve` |
+| VS Code extension | **beta** | `deploy/vscode/` |
+| GitHub Action | **beta** | `deploy/github-action/action.yml` with SARIF |
+| Swarm playbooks (5) | **beta** | `playbooks/{bug-bounty,external-asm,ci-cd,internal-network,ctf-solver}.yaml` |
+| Live dashboard | **alpha** | `web/`; UI built, wiring to live campaigns in progress |
+| Burp MCP bridge | **planned** | Wave 2 |
+| Metasploit / ZAP / sqlmap adapters | **planned** | Wave 2 |
+| Fine-tuned Pentest-Swarm model | **planned** | Wave 3 (Pentest-R1 recipe) |
+| Cybench / AutoPenBench benchmarks | **planned** | Wave 3 |
 
 ---
 
 ## CLI
 
 ```bash
-pentestswarm scan <target> --scope <scope>     # Launch the swarm
-pentestswarm campaign watch <id>                # Live TUI — watch agents work
-pentestswarm campaign explore <id>              # Browse attack surface interactively
-pentestswarm explain <finding-id>               # Explain in plain English
-pentestswarm doctor                             # 8-point system health check
-pentestswarm serve                              # Start API server + dashboard
-pentestswarm mcp serve                          # MCP server for Claude/Cursor
-pentestswarm ctf solve <target>                 # Autonomous CTF solving
-pentestswarm playbook run <name>                # Run a community playbook
+pentestswarm scan <target> --scope <scope>              # Launch the swarm
+pentestswarm scan <target> --scope <scope> --swarm      # Use the stigmergic scheduler
+pentestswarm scan <target> --scope <scope> --strict     # Fail on LLM errors
+pentestswarm campaign watch <id>                        # Live TUI — watch agents work
+pentestswarm campaign explore <id>                      # Browse attack surface interactively
+pentestswarm playbook run <name> --target <t>           # Run a community playbook
+pentestswarm doctor                                     # 8-point system health check
+pentestswarm mcp serve                                  # MCP server for Claude/Cursor
+pentestswarm serve                                      # Start API server + dashboard
 ```
 
 ---
@@ -176,7 +199,7 @@ All agents inherit from a single provider config. Set one key, the entire swarm 
 
 | Provider | Setup | Privacy | Best for |
 |----------|-------|---------|----------|
-| **Claude** (default) | `export PENTESTSWARM_ORCHESTRATOR_API_KEY=...` | Cloud | Best quality, zero setup |
+| **Claude** (default) | `export PENTESTSWARM_ORCHESTRATOR_API_KEY=...` | Cloud | Best quality, zero setup, prompt caching |
 | **Ollama** | Install Ollama + pull models | 100% local | Full privacy, air-gapped |
 | **LM Studio** | Load model, enable server | 100% local | GUI model management |
 
@@ -189,11 +212,10 @@ All agents inherit from a single provider config. Set one key, the entire swarm 
 | Platform | **Go 1.24** | Single binary, goroutine concurrency, native security tools |
 | CLI | **Cobra + bubbletea** | Beautiful TUI with multi-panel agent view |
 | LLM | **Claude API / Ollama / LM Studio** | Best quality cloud + full privacy local |
-| Security Tools | **subfinder, httpx, nuclei, naabu, katana, dnsx, gau** | Native Go libraries, no subprocess |
-| API | **Fiber** (fasthttp) | High-performance HTTP |
-| Database | **PostgreSQL 16 + pgvector** | Campaign history + semantic search |
+| Security Tools | **subfinder · httpx · nuclei · naabu · katana · dnsx · gau · nmap** | ProjectDiscovery Go libs + nmap subprocess |
+| Blackboard | **Postgres 16 + pgvector** | Transactional writes, vector similarity, pheromone decay in SQL |
 | Cache | **Redis 7** | Rate limiting, session state |
-| Dashboard | **Next.js 15 + shadcn/ui + tremor** | Dark-first, chart-heavy, enterprise-grade |
+| Dashboard | **Next.js 15 + shadcn/ui + tremor** | Dark-first, chart-heavy |
 | MCP | **JSON-RPC stdio** | Claude Desktop + Cursor integration |
 
 ---
@@ -205,17 +227,32 @@ git clone https://github.com/Armur-Ai/Pentest-Swarm-AI.git
 cd Pentest-Swarm-AI
 ./scripts/setup.sh    # Install tools, start Postgres/Redis/Ollama
 make build            # Compile binary
-make test             # Run tests (24 passing)
+make test             # Run tests
 make dev              # Hot-reload development
 ```
+
+Regenerate the demo GIF after any CLI change:
+
+```bash
+brew install vhs      # one-off
+vhs docs/demo.tape
+```
+
+---
+
+## Roadmap
+
+See [**IMPLEMENTATION_PLAN.md**](IMPLEMENTATION_PLAN.md) for the full phased plan. Short version:
+
+- **Wave 1** (in flight): real swarm architecture (done), dashboard wire-up, Burp MCP
+- **Wave 2**: sqlmap / Metasploit / ZAP adapters, bug-bounty + ASM + CI/CD playbook polish, official GitHub Action in Marketplace
+- **Wave 3**: fine-tuned Pentest-Swarm model (Pentest-R1 recipe), Cybench / AutoPenBench / CVE-Bench numbers, agent-memory poisoning hardening (MINJA / MemoryGraft defences)
 
 ---
 
 ## Why "Swarm"?
 
-Traditional pentesting tools run one scan at a time. Pentest Swarm AI deploys **multiple specialist agents working in parallel** — each one an expert at its job — coordinated by an orchestrator that thinks, adapts, and makes strategic decisions. Like a swarm, each agent is simple but the collective intelligence is powerful.
-
-The swarm learns from every engagement. Each scan makes the next one smarter. Community playbooks compound the knowledge. The shared intelligence network means every user benefits from every other user's scans.
+Single agents are tools. Pipelines dressed up as agents are slightly fancier tools. A **swarm** is different: agents share an environment, each agent's writes influence other agents' behaviour, and the useful work is emergent rather than prescribed. That's what lets a swarm handle a 1,000-subdomain target without anyone writing a plan for it.
 
 **One agent is a tool. A swarm is a platform.**
 
