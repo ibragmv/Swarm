@@ -7,8 +7,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/logger"
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/swarm/blackboard"
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 // Scheduler is the thin coordinator for the swarm. It does NOT plan — each
@@ -25,6 +27,9 @@ type Scheduler struct {
 
 	// onEvent is an optional observability hook. Nil is fine.
 	onEvent func(Event)
+
+	// tracer is the distributed-tracing plug point. Defaults to NoopTracer.
+	tracer Tracer
 }
 
 // Event is a structured scheduler event emitted via the onEvent hook.
@@ -50,12 +55,22 @@ func WithEventSink(fn func(Event)) SchedulerOption {
 	return func(s *Scheduler) { s.onEvent = fn }
 }
 
+// WithTracer installs a Tracer for per-iteration spans. Defaults to NoopTracer.
+func WithTracer(t Tracer) SchedulerOption {
+	return func(s *Scheduler) {
+		if t != nil {
+			s.tracer = t
+		}
+	}
+}
+
 // NewScheduler creates a scheduler for the given campaign.
 func NewScheduler(board blackboard.Board, campaignID uuid.UUID, opts ...SchedulerOption) *Scheduler {
 	s := &Scheduler{
 		board:               board,
 		campaignID:          campaignID,
 		budgetCheckInterval: 5 * time.Second,
+		tracer:              NoopTracer{},
 	}
 	for _, opt := range opts {
 		opt(s)
@@ -200,7 +215,13 @@ func (s *Scheduler) runAgent(ctx context.Context, agent Agent) {
 					Type: "agent_started", Timestamp: start, CampaignID: s.campaignID,
 					AgentName: agent.Name(), FindingID: finding.ID,
 				})
-				err := agent.Handle(ctx, finding, s.board)
+				spanCtx, end := s.tracer.StartSpan(ctx, "swarm.agent.handle",
+					Attr{"agent", agent.Name()},
+					Attr{"finding.id", finding.ID.String()},
+					Attr{"finding.type", string(finding.Type)},
+				)
+				err := agent.Handle(spanCtx, finding, s.board)
+				end(err)
 				duration := time.Since(start)
 				// Always commit cursor and charge budget regardless of success.
 				_ = s.board.CommitCursor(ctx, s.campaignID, agent.Name(), finding.ID)
@@ -238,6 +259,28 @@ func (s *Scheduler) runAgent(ctx context.Context, agent Agent) {
 }
 
 func (s *Scheduler) emit(e Event) {
+	// Structured log for every scheduler event (plumbs to Grafana/Loki etc).
+	log := logger.Get().With(
+		zap.String("subsystem", "scheduler"),
+		zap.String("campaign_id", e.CampaignID.String()),
+	)
+	fields := []zap.Field{zap.String("event", e.Type)}
+	if e.AgentName != "" {
+		fields = append(fields, zap.String("agent", e.AgentName))
+	}
+	if e.FindingID != uuid.Nil {
+		fields = append(fields, zap.String("finding_id", e.FindingID.String()))
+	}
+	if e.Detail != "" {
+		fields = append(fields, zap.String("detail", e.Detail))
+	}
+	switch e.Type {
+	case "agent_error", "budget_exceeded":
+		log.Warn("scheduler.event", fields...)
+	default:
+		log.Info("scheduler.event", fields...)
+	}
+
 	if s.onEvent != nil {
 		s.onEvent(e)
 	}

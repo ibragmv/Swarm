@@ -84,10 +84,10 @@ Replace the sequential 5-phase runner (`internal/engine/runner.go:56-298`) with 
   - [x] CLI flag `--exploration-bias {low,med,high}` — scales pheromone base at write time
 - [ ] **1.1.7** Delete `internal/engine/runner.go` sequential pipeline (keep a `legacy` subcommand behind `--legacy` flag for 1 release)
 - [x] **1.1.8** Integration test: `tests/integration/swarm_e2e_test.go` — seed → 3 agents → asserts dispatch counts + final board shape
-- [ ] **1.1.9** Observability
-  - [ ] OpenTelemetry spans per agent iteration
-  - [ ] Export pheromone heatmap as Grafana dashboard
-  - [ ] Log every blackboard write with structured JSON
+- [x] **1.1.9** Observability
+  - [x] `swarm.Tracer` interface + NoopTracer; scheduler wraps every `Agent.Handle` in a span (OTel bridge is a few-line adapter — no SDK dep needed)
+  - [x] Grafana dashboard JSON in `deploy/metrics/grafana-swarm-dashboard.json` (findings-per-type, active agents, budget, error rate)
+  - [x] `blackboard.LoggingBoard` emits structured JSON for every write / cursor commit / budget mutation via zap
 
 ### Phase 1.2 — Dashboard Wire-up
 
