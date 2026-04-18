@@ -132,9 +132,9 @@ Current state: `web/` dashboard renders, `SeverityChart` hardcodes zeros, runner
   - [x] Cache system prompt (tool definitions not yet cached — follow-up)
   - [ ] Cache per-campaign shared context (scope, objective, recon summary) *(follow-up)*
   - [x] Emit cache-hit metrics via `Usage.CacheHitRate()`
-- [ ] **1.4.3** Structured tool-use (replace JSON-in-prompt)
-  - [ ] Define agent actions as Anthropic tools
-  - [ ] Removes the JSON-parse-fail path entirely
+- [x] **1.4.3** Structured tool-use for the classifier
+  - [x] `emit_classified_findings` tool with JSON-Schema enum for severity + confidence
+  - [x] Tool-call path used for providers with `SupportsToolUse()` (Claude); legacy JSON-in-prompt retained as fallback for Ollama / LM Studio
 - [ ] **1.4.4** Token budget per campaign + per agent — hard cap with soft warn
 - [ ] **1.4.5** Add eval harness `tests/llm_eval/` — run fixed prompts, assert outputs match rubrics (per agent)
 

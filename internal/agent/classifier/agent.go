@@ -151,24 +151,72 @@ func (c *ClassifierAgent) Classify(ctx context.Context, campaignID uuid.UUID, ra
 	}, nil
 }
 
+// classifierTool is the structured tool schema we ask the LLM to populate.
+// Providers that advertise SupportsToolUse() get this path; others fall
+// back to the legacy JSON-in-prompt path below.
+var classifierTool = llm.Tool{
+	Name:        "emit_classified_findings",
+	Description: "Emit enriched classifications for each input finding in the same order.",
+	Parameters: json.RawMessage(`{
+		"type": "object",
+		"properties": {
+			"findings": {
+				"type": "array",
+				"items": {
+					"type": "object",
+					"properties": {
+						"input_index":      { "type": "integer", "description": "0-based index matching the input array order" },
+						"title":            { "type": "string" },
+						"description":      { "type": "string" },
+						"cve_ids":          { "type": "array", "items": { "type": "string" } },
+						"cvss_score":       { "type": "number" },
+						"cvss_vector":      { "type": "string" },
+						"severity":         { "type": "string", "enum": ["critical","high","medium","low","informational"] },
+						"attack_category":  { "type": "string" },
+						"confidence":       { "type": "string", "enum": ["high","medium","low","unverified"] }
+					},
+					"required": ["input_index","title","severity","cvss_score","confidence"]
+				}
+			}
+		},
+		"required": ["findings"]
+	}`),
+}
+
+type classifierToolOutput struct {
+	Findings []struct {
+		InputIndex     int      `json:"input_index"`
+		Title          string   `json:"title"`
+		Description    string   `json:"description"`
+		CVEIDs         []string `json:"cve_ids"`
+		CVSSScore      float64  `json:"cvss_score"`
+		CVSSVector     string   `json:"cvss_vector"`
+		Severity       string   `json:"severity"`
+		AttackCategory string   `json:"attack_category"`
+		Confidence     string   `json:"confidence"`
+	} `json:"findings"`
+}
+
 // classifyBatch sends a batch of findings to the LLM for enrichment.
+// When the provider supports tool-use (Claude), we use structured tool
+// calls so the response is guaranteed-parseable. Otherwise we fall back
+// to JSON-in-prompt.
 func (c *ClassifierAgent) classifyBatch(ctx context.Context, findings []pipeline.ClassifiedFinding) ([]pipeline.ClassifiedFinding, error) {
 	findingsJSON, _ := json.Marshal(findings)
+	userMsg := fmt.Sprintf(
+		"Classify and enrich these security findings. Call the emit_classified_findings tool with one entry per input in the same order (input_index starts at 0).\n\n%s",
+		string(findingsJSON),
+	)
 
 	req := llm.CompletionRequest{
-		SystemPrompt: classifierSystemPrompt,
-		Messages: []llm.Message{
-			{
-				Role: "user",
-				Content: fmt.Sprintf(
-					"Classify and enrich these security findings with CVE IDs, CVSS scores, severity, attack category, and confidence. Return a JSON array of classified findings.\n\n%s",
-					string(findingsJSON),
-				),
-			},
-		},
+		SystemPrompt:      classifierSystemPrompt,
+		Messages:          []llm.Message{{Role: "user", Content: userMsg}},
 		MaxTokens:         4096,
 		Temperature:       0.1,
 		CacheSystemPrompt: true,
+	}
+	if c.provider.SupportsToolUse() {
+		req.Tools = []llm.Tool{classifierTool}
 	}
 
 	resp, err := c.provider.Complete(ctx, req)
@@ -176,13 +224,36 @@ func (c *ClassifierAgent) classifyBatch(ctx context.Context, findings []pipeline
 		return nil, fmt.Errorf("classifier LLM call failed: %w", err)
 	}
 
-	// Parse response
+	// Structured path: prefer tool calls if present.
+	if len(resp.ToolCalls) > 0 && resp.ToolCalls[0].Name == classifierTool.Name {
+		var out classifierToolOutput
+		if err := json.Unmarshal([]byte(resp.ToolCalls[0].Arguments), &out); err != nil {
+			return nil, fmt.Errorf("parsing classifier tool args: %w", err)
+		}
+		enriched := make([]pipeline.ClassifiedFinding, len(findings))
+		copy(enriched, findings)
+		for _, f := range out.Findings {
+			if f.InputIndex < 0 || f.InputIndex >= len(enriched) {
+				continue
+			}
+			enriched[f.InputIndex].Title = f.Title
+			enriched[f.InputIndex].Description = f.Description
+			enriched[f.InputIndex].CVEIDs = f.CVEIDs
+			enriched[f.InputIndex].CVSSScore = f.CVSSScore
+			enriched[f.InputIndex].CVSSVector = f.CVSSVector
+			enriched[f.InputIndex].Severity = pipeline.Severity(f.Severity)
+			enriched[f.InputIndex].AttackCategory = f.AttackCategory
+			enriched[f.InputIndex].Confidence = pipeline.Confidence(f.Confidence)
+		}
+		return enriched, nil
+	}
+
+	// Fallback: parse JSON out of the text response.
 	content := stripCodeFence(resp.Content)
 	var enriched []pipeline.ClassifiedFinding
 	if err := json.Unmarshal([]byte(content), &enriched); err != nil {
 		return nil, fmt.Errorf("parsing classifier response: %w", err)
 	}
-
 	return enriched, nil
 }
 
