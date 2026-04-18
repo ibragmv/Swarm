@@ -1,24 +1,3 @@
-> ### Credits & Inspiration
-> This project stands on the shoulders of giants. We credit and thank these projects for pioneering AI-powered offensive security:
->
-> - [**PentestGPT**](https://github.com/GreyDGL/PentestGPT) — the OG that proved LLMs can pentest
-> - [**PentAGI**](https://github.com/vxcontrol/pentagi) — fully autonomous agent architecture
-> - [**Strix**](https://github.com/usestrix/strix) — AI hackers that find and fix vulns
-> - [**CAI**](https://github.com/aliasrobotics/cai) — cybersecurity AI framework, 3600x faster than humans
-> - [**HackingBuddyGPT**](https://github.com/ipa-lab/hackingBuddyGPT) — LLM hacking in 50 lines of code
-> - [**Shannon**](https://github.com/KeygraphHQ/shannon) — white-box AI pentester
-> - [**BlacksmithAI**](https://github.com/fr0gger/BlacksmithAI) — multi-agent pentest framework
-> - [**PentestAgent**](https://github.com/GH05TCREW/pentestagent) — black-box AI security testing
-> - [**Pentest Copilot**](https://github.com/bugbasesecurity/pentest-copilot) — AI-driven pentest agent
->
-> Their open-source contributions made tools like this possible.
-
-> **Legal Disclaimer:** Pentest Swarm AI is designed exclusively for **authorized security testing**, **bug bounty programs**, **CTF competitions**, and **educational research**. You must obtain explicit written permission from the target system owner before running any scan. Unauthorized access to computer systems is illegal under the Computer Fraud and Abuse Act (CFAA), the Computer Misuse Act, and equivalent laws worldwide. The authors and contributors of this project accept **no liability** for misuse, damage, or any illegal activity conducted with this tool. By using this software, you agree that you are solely responsible for ensuring your use complies with all applicable laws and regulations. **Do not use this tool against systems you do not own or have explicit authorization to test.**
-
-<p align="center">
-  <img src="banner/pentest-swarm-ai-banner.gif?v=3" alt="Pentest Swarm AI" width="800">
-</p>
-
 <p align="center">
   <h1 align="center">Pentest Swarm AI</h1>
   <p align="center">
@@ -38,12 +17,33 @@
 </p>
 
 <p align="center">
+  <img src="banner/pentest-swarm-ai-banner.gif?v=3" alt="Pentest Swarm AI architecture" width="800">
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/github/stars/Armur-Ai/Pentest-Swarm-AI?style=for-the-badge&color=f59e0b" alt="Stars">
   <img src="https://img.shields.io/badge/Go-1.24-00ADD8?style=for-the-badge&logo=go" alt="Go">
   <img src="https://img.shields.io/badge/License-Apache%202.0-blue?style=for-the-badge" alt="License">
   <img src="https://img.shields.io/badge/AI-Claude%20%7C%20Ollama-purple?style=for-the-badge" alt="AI">
   <img src="https://img.shields.io/badge/status-alpha-orange?style=for-the-badge" alt="Status">
 </p>
+
+> ### Credits & Inspiration
+> This project stands on the shoulders of giants. We credit and thank these projects for pioneering AI-powered offensive security:
+>
+> - [**PentestGPT**](https://github.com/GreyDGL/PentestGPT) — the OG that proved LLMs can pentest
+> - [**PentAGI**](https://github.com/vxcontrol/pentagi) — fully autonomous agent architecture
+> - [**Strix**](https://github.com/usestrix/strix) — AI hackers that find and fix vulns
+> - [**CAI**](https://github.com/aliasrobotics/cai) — cybersecurity AI framework, 3600x faster than humans
+> - [**HackingBuddyGPT**](https://github.com/ipa-lab/hackingBuddyGPT) — LLM hacking in 50 lines of code
+> - [**Shannon**](https://github.com/KeygraphHQ/shannon) — white-box AI pentester
+> - [**BlacksmithAI**](https://github.com/fr0gger/BlacksmithAI) — multi-agent pentest framework
+> - [**PentestAgent**](https://github.com/GH05TCREW/pentestagent) — black-box AI security testing
+> - [**Pentest Copilot**](https://github.com/bugbasesecurity/pentest-copilot) — AI-driven pentest agent
+>
+> Their open-source contributions made tools like this possible.
+
+> **Legal Disclaimer:** Pentest Swarm AI is designed exclusively for **authorized security testing**, **bug bounty programs**, **CTF competitions**, and **educational research**. You must obtain explicit written permission from the target system owner before running any scan. Unauthorized access to computer systems is illegal under the Computer Fraud and Abuse Act (CFAA), the Computer Misuse Act, and equivalent laws worldwide. The authors and contributors of this project accept **no liability** for misuse, damage, or any illegal activity conducted with this tool. By using this software, you agree that you are solely responsible for ensuring your use complies with all applicable laws and regulations. **Do not use this tool against systems you do not own or have explicit authorization to test.**
 
 ---
 
