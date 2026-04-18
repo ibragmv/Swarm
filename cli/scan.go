@@ -116,7 +116,12 @@ func runScan(cmd *cobra.Command, args []string) error {
 		runnerOpts = append(runnerOpts, engine.WithStrictLLM())
 	}
 	runner := engine.NewRunner(cfg, runnerOpts...)
-	if err := runner.Run(ctx, cc, onEvent); err != nil {
+	useSwarm, _ := cmd.Flags().GetBool("swarm")
+	run := runner.Run
+	if useSwarm {
+		run = runner.RunSwarm
+	}
+	if err := run(ctx, cc, onEvent); err != nil {
 		if ctx.Err() != nil {
 			fmt.Println(colorRed("\nCampaign aborted by user."))
 			return nil
@@ -192,6 +197,7 @@ func init() {
 	scanCmd.Flags().String("format", "md", "report format: md|html|json|all")
 	scanCmd.Flags().Bool("follow", false, "stream live output (default when interactive)")
 	scanCmd.Flags().Bool("strict", false, "abort on any LLM error instead of degrading to heuristics")
+	scanCmd.Flags().Bool("swarm", false, "use the stigmergic swarm scheduler (experimental); default is the sequential 5-phase runner")
 	scanCmd.Flags().String("auth-token", "", "authorization token")
 
 	_ = scanCmd.MarkFlagRequired("scope")
