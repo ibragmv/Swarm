@@ -182,10 +182,12 @@ Current state: `web/` dashboard renders, `SeverityChart` hardcodes zeros, runner
   - [x] Burp tool constants + helpers: `StartActiveScan`, `GetIssues`, `ListTools`, `Ping`
   - [x] Swarm agent `agents.BurpAgent` triggers on `HTTP_ENDPOINT` findings above 0.5 pheromone, publishes Burp issues as `CVE_MATCH`
   - [x] 5 unit tests use httptest-backed JSON-RPC server, so CI runs with no Burp install
-- [ ] **2.2.2** **Metasploit** via MSGRPC
-  - [ ] Module search + execution
-  - [ ] Session management (kept out of LLM context; referenced by handle)
-  - [ ] All sessions registered in cleanup registry
+- [x] **2.2.2** **Metasploit** via msfrpcd
+  - [x] HTTP/JSON client at `internal/integrations/metasploit/client.go` (msgpack was too opaque; msfrpcd supports JSON fine)
+  - [x] `auth.login` token cached, transparent refresh on 401
+  - [x] `module.execute`, `session.list`, `session.stop`, `job.stop` primitives
+  - [x] 5 unit tests use httptest-backed fake msfrpcd; covers token refresh, session lifecycle
+  - [ ] Swarm agent that registers every session with the cleanup registry (follow-up, needs an exploit-agent extension)
 - [ ] **2.2.3** **OWASP ZAP** REST API
   - [ ] Spider + active scan triggers
   - [ ] Consume ZAP alerts as findings
