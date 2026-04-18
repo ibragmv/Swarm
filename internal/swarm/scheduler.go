@@ -205,6 +205,28 @@ func (s *Scheduler) runAgent(ctx context.Context, agent Agent) {
 				inflight.Wait()
 				return
 			}
+			// Per-agent budget gate. If this agent blew its token cap we
+			// skip dispatch (and record a single WARN-level event so the
+			// operator knows). Cursor is NOT advanced, so the finding
+			// can be retried after the operator raises the cap.
+			bud, _ := s.board.AgentBudget(ctx, s.campaignID, agent.Name())
+			if bud.Exceeded() {
+				s.emit(Event{
+					Type: "agent_budget_exceeded", Timestamp: time.Now(), CampaignID: s.campaignID,
+					AgentName: agent.Name(),
+					Detail:    fmt.Sprintf("%d/%d tokens", bud.TokensUsed, bud.MaxTokens),
+				})
+				continue
+			}
+			if bud.ShouldWarn() {
+				s.emit(Event{
+					Type: "agent_budget_warn", Timestamp: time.Now(), CampaignID: s.campaignID,
+					AgentName: agent.Name(),
+					Detail:    fmt.Sprintf("%d/%d tokens (soft threshold)", bud.TokensUsed, bud.WarnAtTokens),
+				})
+				// Flip the warned flag with a no-op charge so we only warn once.
+				_ = s.board.ChargeAgent(ctx, s.campaignID, agent.Name(), 0)
+			}
 			sem <- struct{}{}
 			inflight.Add(1)
 			go func(finding blackboard.Finding) {

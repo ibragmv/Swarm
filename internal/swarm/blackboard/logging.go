@@ -115,3 +115,30 @@ func (b *LoggingBoard) SetBudgetLimits(ctx context.Context, campaignID uuid.UUID
 		zap.Error(err))
 	return err
 }
+
+// AgentBudget passes through.
+func (b *LoggingBoard) AgentBudget(ctx context.Context, campaignID uuid.UUID, agent string) (AgentBudget, error) {
+	return b.inner.AgentBudget(ctx, campaignID, agent)
+}
+
+// ChargeAgent logs at DEBUG (high volume per LLM call).
+func (b *LoggingBoard) ChargeAgent(ctx context.Context, campaignID uuid.UUID, agent string, tokens int64) error {
+	err := b.inner.ChargeAgent(ctx, campaignID, agent, tokens)
+	b.log.Debug("blackboard.agent.charge",
+		zap.String("agent", agent),
+		zap.Int64("tokens", tokens),
+		zap.Error(err))
+	return err
+}
+
+// SetAgentBudget logs at INFO — important for audit.
+func (b *LoggingBoard) SetAgentBudget(ctx context.Context, campaignID uuid.UUID, agent string, maxTokens, warnAt int64) error {
+	err := b.inner.SetAgentBudget(ctx, campaignID, agent, maxTokens, warnAt)
+	b.log.Info("blackboard.agent.budget.limits",
+		zap.String("campaign_id", campaignID.String()),
+		zap.String("agent", agent),
+		zap.Int64("max_tokens", maxTokens),
+		zap.Int64("warn_at", warnAt),
+		zap.Error(err))
+	return err
+}

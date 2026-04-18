@@ -330,6 +330,64 @@ func (b *PostgresBoard) SetBudgetLimits(ctx context.Context, campaignID uuid.UUI
 	return nil
 }
 
+// AgentBudget reads (or creates-with-defaults) the per-agent budget row.
+func (b *PostgresBoard) AgentBudget(ctx context.Context, campaignID uuid.UUID, agent string) (AgentBudget, error) {
+	var bud AgentBudget
+	bud.CampaignID = campaignID
+	bud.Agent = agent
+	err := b.pool.QueryRow(ctx,
+		`INSERT INTO swarm_agent_budgets (campaign_id, agent_name)
+		 VALUES ($1, $2)
+		 ON CONFLICT (campaign_id, agent_name) DO UPDATE SET updated_at = NOW()
+		 RETURNING max_tokens, warn_at_tokens, tokens_used, warned`,
+		campaignID, agent,
+	).Scan(&bud.MaxTokens, &bud.WarnAtTokens, &bud.TokensUsed, &bud.Warned)
+	if err != nil {
+		return bud, fmt.Errorf("agent budget: %w", err)
+	}
+	return bud, nil
+}
+
+// ChargeAgent increments tokens_used and flips Warned when the soft
+// threshold is first crossed. Atomic via a single UPDATE.
+func (b *PostgresBoard) ChargeAgent(ctx context.Context, campaignID uuid.UUID, agent string, tokens int64) error {
+	// Ensure the row exists first.
+	if _, err := b.AgentBudget(ctx, campaignID, agent); err != nil {
+		return err
+	}
+	_, err := b.pool.Exec(ctx,
+		`UPDATE swarm_agent_budgets
+		   SET tokens_used = tokens_used + $3,
+		       warned = warned OR (tokens_used + $3 >= warn_at_tokens),
+		       updated_at = NOW()
+		 WHERE campaign_id = $1 AND agent_name = $2`,
+		campaignID, agent, tokens,
+	)
+	if err != nil {
+		return fmt.Errorf("charge agent: %w", err)
+	}
+	return nil
+}
+
+// SetAgentBudget overrides the caps (and clears Warned if usage is now
+// below the new soft threshold).
+func (b *PostgresBoard) SetAgentBudget(ctx context.Context, campaignID uuid.UUID, agent string, maxTokens, warnAt int64) error {
+	_, err := b.pool.Exec(ctx,
+		`INSERT INTO swarm_agent_budgets (campaign_id, agent_name, max_tokens, warn_at_tokens)
+		 VALUES ($1, $2, $3, $4)
+		 ON CONFLICT (campaign_id, agent_name) DO UPDATE
+		   SET max_tokens = EXCLUDED.max_tokens,
+		       warn_at_tokens = EXCLUDED.warn_at_tokens,
+		       warned = swarm_agent_budgets.tokens_used >= EXCLUDED.warn_at_tokens,
+		       updated_at = NOW()`,
+		campaignID, agent, maxTokens, warnAt,
+	)
+	if err != nil {
+		return fmt.Errorf("set agent budget: %w", err)
+	}
+	return nil
+}
+
 // embeddingArg converts a float32 vector into the string literal pgvector accepts.
 // Returns nil (which pgx will send as NULL) for an empty slice.
 func embeddingArg(v []float32) any {

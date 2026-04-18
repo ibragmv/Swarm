@@ -15,12 +15,13 @@ import (
 // MemoryBoard is an in-process implementation of Board. Useful for tests
 // and for running a campaign without a database. Not durable across restarts.
 type MemoryBoard struct {
-	mu       sync.RWMutex
-	now      func() time.Time
-	findings []Finding
-	cursors  map[cursorKey]uuid.UUID
-	budgets  map[uuid.UUID]Budget
-	subs     []*memSub
+	mu           sync.RWMutex
+	now          func() time.Time
+	findings     []Finding
+	cursors      map[cursorKey]uuid.UUID
+	budgets      map[uuid.UUID]Budget
+	agentBudgets map[cursorKey]AgentBudget
+	subs         []*memSub
 }
 
 type cursorKey struct {
@@ -42,10 +43,67 @@ func NewMemoryBoard(now func() time.Time) *MemoryBoard {
 		now = time.Now
 	}
 	return &MemoryBoard{
-		now:     now,
-		cursors: map[cursorKey]uuid.UUID{},
-		budgets: map[uuid.UUID]Budget{},
+		now:          now,
+		cursors:      map[cursorKey]uuid.UUID{},
+		budgets:      map[uuid.UUID]Budget{},
+		agentBudgets: map[cursorKey]AgentBudget{},
 	}
+}
+
+// AgentBudget reads (or initialises) the budget for (campaign, agent).
+func (b *MemoryBoard) AgentBudget(ctx context.Context, campaignID uuid.UUID, agent string) (AgentBudget, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	k := cursorKey{campaignID, agent}
+	bud, ok := b.agentBudgets[k]
+	if !ok {
+		bud = AgentBudget{
+			CampaignID:   campaignID,
+			Agent:        agent,
+			MaxTokens:    500_000,
+			WarnAtTokens: 400_000,
+		}
+		b.agentBudgets[k] = bud
+	}
+	return bud, nil
+}
+
+// ChargeAgent adds tokens to an agent's usage and flips Warned when the
+// soft threshold is crossed.
+func (b *MemoryBoard) ChargeAgent(ctx context.Context, campaignID uuid.UUID, agent string, tokens int64) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	k := cursorKey{campaignID, agent}
+	bud, ok := b.agentBudgets[k]
+	if !ok {
+		bud = AgentBudget{
+			CampaignID: campaignID, Agent: agent,
+			MaxTokens: 500_000, WarnAtTokens: 400_000,
+		}
+	}
+	bud.TokensUsed += tokens
+	if !bud.Warned && bud.WarnAtTokens > 0 && bud.TokensUsed >= bud.WarnAtTokens {
+		bud.Warned = true
+	}
+	b.agentBudgets[k] = bud
+	return nil
+}
+
+// SetAgentBudget overrides the per-agent caps.
+func (b *MemoryBoard) SetAgentBudget(ctx context.Context, campaignID uuid.UUID, agent string, maxTokens, warnAt int64) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	k := cursorKey{campaignID, agent}
+	bud := b.agentBudgets[k]
+	bud.CampaignID = campaignID
+	bud.Agent = agent
+	bud.MaxTokens = maxTokens
+	bud.WarnAtTokens = warnAt
+	if bud.TokensUsed < warnAt {
+		bud.Warned = false
+	}
+	b.agentBudgets[k] = bud
+	return nil
 }
 
 func (b *MemoryBoard) Write(ctx context.Context, f Finding, opts ...WriteOption) (uuid.UUID, error) {

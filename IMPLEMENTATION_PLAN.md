@@ -135,7 +135,10 @@ Current state: `web/` dashboard renders, `SeverityChart` hardcodes zeros, runner
 - [x] **1.4.3** Structured tool-use for the classifier
   - [x] `emit_classified_findings` tool with JSON-Schema enum for severity + confidence
   - [x] Tool-call path used for providers with `SupportsToolUse()` (Claude); legacy JSON-in-prompt retained as fallback for Ollama / LM Studio
-- [ ] **1.4.4** Token budget per campaign + per agent — hard cap with soft warn
+- [x] **1.4.4** Token budget per campaign + per agent — hard cap with soft warn
+  - Per-campaign budget already enforced by scheduler (agent-hours + tokens)
+  - Per-agent layer added: `swarm_agent_budgets` table, `AgentBudget` / `ChargeAgent` / `SetAgentBudget` on the Board; scheduler emits `agent_budget_warn` at soft threshold and skips dispatch after hard cap
+  - 3 unit tests cover defaults, warn transition, threshold-raise clears warned flag
 - [ ] **1.4.5** Add eval harness `tests/llm_eval/` — run fixed prompts, assert outputs match rubrics (per agent)
 
 ### Phase 1.5 — README Honesty Pass

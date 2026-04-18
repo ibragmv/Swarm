@@ -43,6 +43,14 @@ type Board interface {
 	Budget(ctx context.Context, campaignID uuid.UUID) (Budget, error)
 	UpdateBudget(ctx context.Context, campaignID uuid.UUID, deltaHours float64, deltaTokens int64) error
 	SetBudgetLimits(ctx context.Context, campaignID uuid.UUID, maxHours float64, maxTokens int64) error
+
+	// Per-agent budget: finer-grained cap so one runaway agent can't burn
+	// the whole campaign's token headroom. Scheduler checks AgentBudget
+	// before dispatch; agents (or an LLM-provider decorator) call ChargeAgent
+	// after each completion.
+	AgentBudget(ctx context.Context, campaignID uuid.UUID, agent string) (AgentBudget, error)
+	ChargeAgent(ctx context.Context, campaignID uuid.UUID, agent string, tokens int64) error
+	SetAgentBudget(ctx context.Context, campaignID uuid.UUID, agent string, maxTokens, warnAtTokens int64) error
 }
 
 // Budget tracks per-campaign resource usage against hard limits.
@@ -62,4 +70,25 @@ func (b Budget) Exceeded() bool {
 // Remaining returns the headroom on each dimension.
 func (b Budget) Remaining() (hours float64, tokens int64) {
 	return b.MaxAgentHours - b.AgentHoursUsed, b.MaxTokens - b.TokensUsed
+}
+
+// AgentBudget is the per-agent token budget. Exists so one chatty agent
+// (think: a classifier that hits the LLM for every finding) can't burn
+// the whole campaign's headroom.
+type AgentBudget struct {
+	CampaignID   uuid.UUID
+	Agent        string
+	MaxTokens    int64
+	WarnAtTokens int64
+	TokensUsed   int64
+	Warned       bool
+}
+
+// Exceeded is true when the hard cap is reached.
+func (b AgentBudget) Exceeded() bool { return b.TokensUsed >= b.MaxTokens }
+
+// ShouldWarn is true on the first transition past the soft threshold.
+// The caller is expected to set Warned=true after emitting a warning.
+func (b AgentBudget) ShouldWarn() bool {
+	return !b.Warned && b.WarnAtTokens > 0 && b.TokensUsed >= b.WarnAtTokens
 }
