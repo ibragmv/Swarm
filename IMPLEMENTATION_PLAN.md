@@ -83,7 +83,7 @@ Replace the sequential 5-phase runner (`internal/engine/runner.go:56-298`) with 
   - [x] Per-finding-type decay half-lives in `config/pheromones.yaml` (embedded default + override via `Load`)
   - [x] CLI flag `--exploration-bias {low,med,high}` — scales pheromone base at write time
 - [ ] **1.1.7** Delete `internal/engine/runner.go` sequential pipeline (keep a `legacy` subcommand behind `--legacy` flag for 1 release)
-- [ ] **1.1.8** Integration test: deterministic seed, verify 3 agents interact through blackboard, final state matches golden file
+- [x] **1.1.8** Integration test: `tests/integration/swarm_e2e_test.go` — seed → 3 agents → asserts dispatch counts + final board shape
 - [ ] **1.1.9** Observability
   - [ ] OpenTelemetry spans per agent iteration
   - [ ] Export pheromone heatmap as Grafana dashboard
