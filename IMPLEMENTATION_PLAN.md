@@ -161,10 +161,12 @@ Current state: `web/` dashboard renders, `SeverityChart` hardcodes zeros, runner
   - [x] XML output parser → findings (`PORT_OPEN`, service/version, OS match)
   - [x] Scope guard in `Run()`; timing flag configurable
   - [x] Requires `nmap` binary; gated via `IsAvailable()` so missing binary = skip
-- [ ] **2.1.2** `sqlmap` adapter via `sqlmapapi` REST
-  - [ ] Triggered by classifier `POTENTIAL_SQLI` findings
-  - [ ] Uses the API daemon mode; one daemon per campaign
-  - [ ] Writes `SQLI_CONFIRMED`, `DB_SCHEMA`, `DB_CREDS` (redacted) to blackboard
+- [x] **2.1.2** `sqlmap` adapter via `sqlmapapi` REST
+  - [x] Full task/new → option/set → scan/start → poll status → data → task/delete lifecycle
+  - [x] Credentials redacted via key-name regex + inline `key=value` redaction before results surface
+  - [x] Defence-in-depth: scope.ValidateAndLog on every call; deferred task delete runs even on timeout
+  - [x] 3 unit tests use httptest-backed fake sqlmapapi so CI needs no sqlmap binary
+  - [ ] Wiring: trigger on classifier `POTENTIAL_SQLI` findings (follow-up — needs a swarm agent adapter)
 - [ ] **2.1.3** `ffuf` adapter `internal/tools/ffuf/ffuf.go`
   - [ ] Content discovery, param fuzzing
   - [ ] Wordlist registry (SecLists auto-download on first run, cached)

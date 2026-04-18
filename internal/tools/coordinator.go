@@ -40,6 +40,7 @@ func NewCoordinator() *Coordinator {
 		NewDnsxTool(),
 		NewGauTool(),
 		NewNmapTool(),
+		NewSqlmapTool(),
 	}
 
 	for _, t := range allTools {
