@@ -42,14 +42,40 @@ type EventCallback func(event pipeline.CampaignEvent)
 type Runner struct {
 	cfg         *config.Config
 	memoryStore *memory.MemoryStore
+	cleanup     pipeline.CleanupRegistryIface
+	strict      bool
+}
+
+// Option customises Runner construction.
+type Option func(*Runner)
+
+// WithCleanupRegistry attaches a cleanup registry (Postgres or memory).
+// If no option is passed, the runner falls back to an in-memory registry
+// that executes cleanup commands via /bin/sh -c.
+func WithCleanupRegistry(reg pipeline.CleanupRegistryIface) Option {
+	return func(r *Runner) { r.cleanup = reg }
+}
+
+// WithStrictLLM turns any LLM error into a fatal campaign failure.
+// Without strict mode, the runner continues with degraded output but
+// emits error events to the stream.
+func WithStrictLLM() Option {
+	return func(r *Runner) { r.strict = true }
 }
 
 // NewRunner creates a campaign runner.
-func NewRunner(cfg *config.Config) *Runner {
-	return &Runner{
+func NewRunner(cfg *config.Config, opts ...Option) *Runner {
+	r := &Runner{
 		cfg:         cfg,
 		memoryStore: memory.NewMemoryStore(),
 	}
+	for _, opt := range opts {
+		opt(r)
+	}
+	if r.cleanup == nil {
+		r.cleanup = pipeline.NewMemoryCleanupRegistry(pipeline.DefaultCleanupExec)
+	}
+	return r
 }
 
 // Run executes a complete penetration test campaign.
@@ -113,6 +139,19 @@ func (r *Runner) Run(ctx context.Context, cc CampaignConfig, onEvent EventCallba
 	}
 
 	emit(pipeline.EventStateChange, "engine", "Campaign initialized")
+
+	// Always run registered cleanup on exit — normal completion, failure,
+	// or context cancellation (SIGINT). Uses a detached context so cleanup
+	// still runs after the campaign context is cancelled.
+	defer func() {
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cleanupCancel()
+		if rep := r.cleanup.RunCleanup(cleanupCtx, campaignID); rep != nil && rep.TotalCount > 0 {
+			emit(pipeline.EventMilestone, "cleanup",
+				fmt.Sprintf("Cleanup ran %d actions (%d executed, %d failed)",
+					rep.TotalCount, len(rep.Executed), len(rep.Failed)))
+		}
+	}()
 
 	// --- Phase 1: RECON ---
 	if err := sm.Start(); err != nil {
@@ -208,7 +247,7 @@ func (r *Runner) Run(ctx context.Context, cc CampaignConfig, onEvent EventCallba
 
 		executor := exploit.NewExecutor(
 			&scope.ScopeDefinition{AllowedDomains: scopeDef.AllowedDomains, AllowedCIDRs: scopeDef.AllowedCIDRs},
-			nil, // cleanup registry (needs DB)
+			r.cleanup,
 			cc.DryRun,
 		)
 
