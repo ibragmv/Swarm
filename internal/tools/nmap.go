@@ -31,7 +31,7 @@ func (n *NmapTool) IsAvailable() bool { return IsCommandAvailable("nmap") }
 // --top-ports 1000 by default. All flags are overridable via opts.
 func (n *NmapTool) Run(ctx context.Context, target string, opts Options) (*ToolResult, error) {
 	if scopeDef := getScopeFromContext(ctx); scopeDef != nil {
-		if err := scope.Validate(target, *scopeDef); err != nil {
+		if err := scope.ValidateAndLog("nmap", target, *scopeDef); err != nil {
 			return nil, fmt.Errorf("scope violation in nmap: %w", err)
 		}
 	}

@@ -17,7 +17,7 @@ func (h *HttpxTool) IsAvailable() bool { return IsCommandAvailable("httpx") }
 func (h *HttpxTool) Run(ctx context.Context, target string, opts Options) (*ToolResult, error) {
 	scopeDef := getScopeFromContext(ctx)
 	if scopeDef != nil {
-		if err := scope.Validate(target, *scopeDef); err != nil {
+		if err := scope.ValidateAndLog("httpx", target, *scopeDef); err != nil {
 			return nil, fmt.Errorf("scope violation in httpx: %w", err)
 		}
 	}

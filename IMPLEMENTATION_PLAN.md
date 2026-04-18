@@ -117,9 +117,10 @@ Current state: `web/` dashboard renders, `SeverityChart` hardcodes zeros, runner
   - [x] Replace naive field splitting with quote-aware `parseCommand`
   - [x] Reject pipes, redirects, backticks, `$(...)`, newlines unless inside quotes
   - [ ] Sandbox: all exploit commands run in a Docker container by default *(deferred to Wave 2)*
-- [ ] **1.3.5** Scope enforcement audit
-  - [ ] Every tool adapter re-validates scope before network call (defense-in-depth)
-  - [ ] Log-and-abort on scope violation, not log-and-continue
+- [x] **1.3.5** Scope enforcement audit
+  - [x] All 8 tool adapters now route through `scope.ValidateAndLog(tool, target, def)` instead of the bare `Validate()` so every check is logged
+  - [x] Violations emit `WARN subsystem=scope` with tool + target + allowed scope, then return the error — never log-and-continue
+  - [x] 9 unit tests cover CIDR boundaries, subdomain matching, wildcards, excluded ranges, and ValidateCommand's non-target allow-list
 
 ### Phase 1.4 — LLM Layer Upgrades
 

@@ -20,7 +20,7 @@ func (n *NaabuTool) IsAvailable() bool { return IsCommandAvailable("naabu") }
 func (n *NaabuTool) Run(ctx context.Context, target string, opts Options) (*ToolResult, error) {
 	scopeDef := getScopeFromContext(ctx)
 	if scopeDef != nil {
-		if err := scope.Validate(target, *scopeDef); err != nil {
+		if err := scope.ValidateAndLog("naabu", target, *scopeDef); err != nil {
 			return nil, fmt.Errorf("scope violation in naabu: %w", err)
 		}
 	}

@@ -20,7 +20,7 @@ func (d *DnsxTool) IsAvailable() bool { return IsCommandAvailable("dnsx") }
 func (d *DnsxTool) Run(ctx context.Context, target string, opts Options) (*ToolResult, error) {
 	scopeDef := getScopeFromContext(ctx)
 	if scopeDef != nil {
-		if err := scope.Validate(target, *scopeDef); err != nil {
+		if err := scope.ValidateAndLog("dnsx", target, *scopeDef); err != nil {
 			return nil, fmt.Errorf("scope violation in dnsx: %w", err)
 		}
 	}

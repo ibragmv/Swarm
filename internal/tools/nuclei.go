@@ -21,7 +21,7 @@ func (n *NucleiTool) IsAvailable() bool { return IsCommandAvailable("nuclei") }
 func (n *NucleiTool) Run(ctx context.Context, target string, opts Options) (*ToolResult, error) {
 	scopeDef := getScopeFromContext(ctx)
 	if scopeDef != nil {
-		if err := scope.Validate(target, *scopeDef); err != nil {
+		if err := scope.ValidateAndLog("nuclei", target, *scopeDef); err != nil {
 			return nil, fmt.Errorf("scope violation in nuclei: %w", err)
 		}
 	}
