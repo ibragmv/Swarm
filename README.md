@@ -13,13 +13,25 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/trending"><img src="https://img.shields.io/badge/GitHub-Trending-ef4444?style=for-the-badge&logo=github&logoColor=white" alt="Trending on GitHub"></a>
   <img src="https://img.shields.io/github/stars/Armur-Ai/Pentest-Swarm-AI?style=for-the-badge&color=f59e0b" alt="Stars">
   <img src="https://img.shields.io/badge/Go-1.24-00ADD8?style=for-the-badge&logo=go" alt="Go">
   <img src="https://img.shields.io/badge/License-Apache%202.0-blue?style=for-the-badge" alt="License">
   <img src="https://img.shields.io/badge/AI-Claude%20%7C%20Ollama-purple?style=for-the-badge" alt="AI">
   <img src="https://img.shields.io/badge/status-alpha-orange?style=for-the-badge" alt="Status">
 </p>
+
+<!-- Once trendshift.io lists the repo, replace the numeric id below.
+     PentAGI's badge (for reference): https://trendshift.io/repositories/15161
+<p align="center">
+  <a href="https://trendshift.io/repositories/__ID__" target="_blank">
+    <img src="https://trendshift.io/api/badge/repositories/__ID__"
+         alt="Armur-Ai/Pentest-Swarm-AI | Trendshift"
+         width="250" height="55"/>
+  </a>
+</p>
+-->
+
+
 
 <p align="center">
   <img src="docs/demo.gif" alt="Pentest Swarm AI — CLI demo" width="900">
