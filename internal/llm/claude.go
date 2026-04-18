@@ -180,9 +180,15 @@ func (c *ClaudeProvider) buildParams(req CompletionRequest) anthropic.MessageNew
 	}
 
 	if req.SystemPrompt != "" {
-		params.System = []anthropic.TextBlockParam{
-			{Text: req.SystemPrompt},
+		block := anthropic.TextBlockParam{Text: req.SystemPrompt}
+		if req.CacheSystemPrompt {
+			ttl := req.CacheTTL
+			if ttl == "" {
+				ttl = "5m"
+			}
+			block.CacheControl = anthropic.CacheControlEphemeralParam{TTL: anthropic.CacheControlEphemeralTTL(ttl)}
 		}
+		params.System = []anthropic.TextBlockParam{block}
 	}
 
 	if req.Temperature > 0 {
@@ -215,8 +221,10 @@ func (c *ClaudeProvider) buildParams(req CompletionRequest) anthropic.MessageNew
 func (c *ClaudeProvider) parseResponse(resp *anthropic.Message) *CompletionResponse {
 	result := &CompletionResponse{
 		Usage: Usage{
-			InputTokens:  int(resp.Usage.InputTokens),
-			OutputTokens: int(resp.Usage.OutputTokens),
+			InputTokens:              int(resp.Usage.InputTokens),
+			OutputTokens:             int(resp.Usage.OutputTokens),
+			CacheCreationInputTokens: int(resp.Usage.CacheCreationInputTokens),
+			CacheReadInputTokens:     int(resp.Usage.CacheReadInputTokens),
 		},
 		StopReason: string(resp.StopReason),
 	}

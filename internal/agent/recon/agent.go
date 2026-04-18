@@ -114,8 +114,9 @@ func (r *ReconAgent) Analyze(ctx context.Context, results []*tools.ToolResult, c
 				),
 			},
 		},
-		MaxTokens:   8192,
-		Temperature: 0.1,
+		MaxTokens:         8192,
+		Temperature:       0.1,
+		CacheSystemPrompt: true,
 	}
 
 	resp, err := r.provider.Complete(ctx, req)

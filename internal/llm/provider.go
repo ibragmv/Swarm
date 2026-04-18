@@ -35,6 +35,17 @@ type CompletionRequest struct {
 	MaxTokens    int       `json:"max_tokens,omitempty"`
 	Temperature  float64   `json:"temperature,omitempty"`
 	SystemPrompt string    `json:"system_prompt,omitempty"`
+
+	// CacheSystemPrompt marks the system prompt as cacheable. Providers
+	// that support prompt caching (currently Claude) will return cache
+	// hits for identical system prompts within the TTL window. Safe to
+	// set true for any stable system prompt.
+	CacheSystemPrompt bool `json:"cache_system_prompt,omitempty"`
+
+	// CacheTTL is the desired cache TTL when CacheSystemPrompt is set.
+	// Valid values: "5m" (default), "1h". Ignored by providers that
+	// do not support caching.
+	CacheTTL string `json:"cache_ttl,omitempty"`
 }
 
 // Message represents a single message in the conversation.
@@ -82,11 +93,23 @@ type ToolCallDelta struct {
 
 // Usage tracks token consumption.
 type Usage struct {
-	InputTokens  int `json:"input_tokens"`
-	OutputTokens int `json:"output_tokens"`
+	InputTokens              int `json:"input_tokens"`
+	OutputTokens             int `json:"output_tokens"`
+	CacheCreationInputTokens int `json:"cache_creation_input_tokens,omitempty"`
+	CacheReadInputTokens     int `json:"cache_read_input_tokens,omitempty"`
 }
 
 // TotalTokens returns the sum of input and output tokens.
 func (u Usage) TotalTokens() int {
-	return u.InputTokens + u.OutputTokens
+	return u.InputTokens + u.OutputTokens + u.CacheCreationInputTokens + u.CacheReadInputTokens
+}
+
+// CacheHitRate returns the fraction of input tokens served from cache.
+// Zero if no cached tokens were attempted.
+func (u Usage) CacheHitRate() float64 {
+	total := u.CacheReadInputTokens + u.CacheCreationInputTokens + u.InputTokens
+	if total == 0 {
+		return 0
+	}
+	return float64(u.CacheReadInputTokens) / float64(total)
 }

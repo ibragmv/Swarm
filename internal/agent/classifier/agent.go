@@ -166,8 +166,9 @@ func (c *ClassifierAgent) classifyBatch(ctx context.Context, findings []pipeline
 				),
 			},
 		},
-		MaxTokens:   4096,
-		Temperature: 0.1,
+		MaxTokens:         4096,
+		Temperature:       0.1,
+		CacheSystemPrompt: true,
 	}
 
 	resp, err := c.provider.Complete(ctx, req)
