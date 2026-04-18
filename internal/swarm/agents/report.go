@@ -142,6 +142,13 @@ func (a *ReportAgent) Handle(ctx context.Context, f blackboard.Finding, board bl
 			rendered["json"] = p
 		}
 	}
+	if want("sarif") {
+		if b, err := a.renderer.ToSARIF(rep); err == nil {
+			p := base + ".sarif"
+			_ = os.WriteFile(p, b, 0o644)
+			rendered["sarif"] = p
+		}
+	}
 
 	if a.onRendered != nil {
 		a.onRendered(rendered)

@@ -347,6 +347,12 @@ func (r *Runner) Run(ctx context.Context, cc CampaignConfig, onEvent EventCallba
 		os.WriteFile(reportPath+".html", html, 0644)
 		emit(pipeline.EventToolResult, "report", fmt.Sprintf("HTML report: %s.html", reportPath))
 	}
+	if cc.Format == "all" || cc.Format == "sarif" {
+		if sarif, err := renderer.ToSARIF(pentestReport); err == nil {
+			os.WriteFile(reportPath+".sarif", sarif, 0644)
+			emit(pipeline.EventToolResult, "report", fmt.Sprintf("SARIF report: %s.sarif", reportPath))
+		}
+	}
 
 	// Complete
 	sm.Complete()
