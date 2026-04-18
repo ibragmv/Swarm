@@ -27,7 +27,10 @@ func NewCoordinator() *Coordinator {
 		tools: make(map[string]Tool),
 	}
 
-	// Register all built-in tools
+	// Register all built-in tools. Tools that rely on external binaries
+	// (nmap) are advertised here but filtered at dispatch time via
+	// IsAvailable() — `pentestswarm doctor` flags missing binaries so
+	// users aren't surprised at scan time.
 	allTools := []Tool{
 		NewSubfinderTool(),
 		NewHttpxTool(),
@@ -36,6 +39,7 @@ func NewCoordinator() *Coordinator {
 		NewKatanaTool(),
 		NewDnsxTool(),
 		NewGauTool(),
+		NewNmapTool(),
 	}
 
 	for _, t := range allTools {
