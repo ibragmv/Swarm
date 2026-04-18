@@ -167,14 +167,13 @@ Current state: `web/` dashboard renders, `SeverityChart` hardcodes zeros, runner
   - [x] Defence-in-depth: scope.ValidateAndLog on every call; deferred task delete runs even on timeout
   - [x] 3 unit tests use httptest-backed fake sqlmapapi so CI needs no sqlmap binary
   - [ ] Wiring: trigger on classifier `POTENTIAL_SQLI` findings (follow-up — needs a swarm agent adapter)
-- [ ] **2.1.3** `ffuf` adapter `internal/tools/ffuf/ffuf.go`
-  - [ ] Content discovery, param fuzzing
-  - [ ] Wordlist registry (SecLists auto-download on first run, cached)
-- [ ] **2.1.4** `gobuster` adapter (alternative content discovery for HTTP + DNS)
-- [ ] **2.1.5** `trufflehog` adapter — repo + artifact secret scanning
-- [ ] **2.1.6** `gitleaks` adapter — Git history secrets
-- [ ] **2.1.7** `semgrep` adapter — SAST for in-scope repos
-- [ ] **2.1.8** `amass` adapter — deeper OSINT/ASM than subfinder
+- [x] **2.1.3** `ffuf` adapter `internal/tools/ffuf.go` — FUZZ URL + wordlist, JSON parse via temp file, scope-guarded
+  - [ ] Wordlist registry (SecLists auto-download on first run, cached) *(follow-up)*
+- [x] **2.1.4** `gobuster` adapter — dir + dns modes, text-line parse
+- [x] **2.1.5** `trufflehog` adapter — NDJSON stream, `Raw` / `RawV2` secret bodies redacted at ingest
+- [x] **2.1.6** `gitleaks` adapter — uses `--redact`, additionally scrubs `Secret` field defence-in-depth; exit-1-on-leaks handled
+- [x] **2.1.7** `semgrep` adapter — p/owasp-top-ten default rule pack, JSON parse, exit-1-on-findings handled
+- [x] **2.1.8** `amass` adapter — passive by default, active via opt-in flag, NDJSON parse
 
 ### Phase 2.2 — Heavyweight Integrations
 

@@ -41,6 +41,12 @@ func NewCoordinator() *Coordinator {
 		NewGauTool(),
 		NewNmapTool(),
 		NewSqlmapTool(),
+		NewFfufTool(),
+		NewGobusterTool(),
+		NewTrufflehogTool(),
+		NewGitleaksTool(),
+		NewSemgrepTool(),
+		NewAmassTool(),
 	}
 
 	for _, t := range allTools {
