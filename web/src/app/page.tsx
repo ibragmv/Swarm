@@ -7,6 +7,14 @@ interface Stats {
   campaigns: number;
   active_campaigns: number;
   total_findings: number;
+  by_severity?: {
+    critical?: number;
+    high?: number;
+    medium?: number;
+    low?: number;
+    info?: number;
+  };
+  by_agent?: Record<string, number>;
 }
 
 export default function DashboardPage() {
@@ -14,12 +22,12 @@ export default function DashboardPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
 
   useEffect(() => {
-    api.stats().then(setStats).catch(() => {});
-    api.campaigns.list().then((r) => setCampaigns(r.data || [])).catch(() => {});
-    const interval = setInterval(() => {
-      api.stats().then(setStats).catch(() => {});
+    const refresh = () => {
+      api.stats().then((s) => setStats(s as Stats)).catch(() => {});
       api.campaigns.list().then((r) => setCampaigns(r.data || [])).catch(() => {});
-    }, 5000);
+    };
+    refresh();
+    const interval = setInterval(refresh, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -91,7 +99,7 @@ export default function DashboardPage() {
         {/* Severity Distribution */}
         <div className="bg-surface rounded-lg border border-border p-4">
           <h3 className="text-sm font-medium text-gray-400 mb-4">Severity Distribution</h3>
-          <SeverityChart />
+          <SeverityChart bySeverity={stats.by_severity} />
         </div>
 
         {/* Agent Status */}
@@ -154,13 +162,24 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function SeverityChart() {
+function SeverityChart({
+  bySeverity,
+}: {
+  bySeverity?: {
+    critical?: number;
+    high?: number;
+    medium?: number;
+    low?: number;
+    info?: number;
+  };
+}) {
+  const b = bySeverity ?? {};
   const data = [
-    { name: "Critical", value: 0, color: "#EF4444" },
-    { name: "High", value: 0, color: "#F97316" },
-    { name: "Medium", value: 0, color: "#EAB308" },
-    { name: "Low", value: 0, color: "#22C55E" },
-    { name: "Info", value: 0, color: "#6B7280" },
+    { name: "Critical", value: b.critical ?? 0, color: "#EF4444" },
+    { name: "High", value: b.high ?? 0, color: "#F97316" },
+    { name: "Medium", value: b.medium ?? 0, color: "#EAB308" },
+    { name: "Low", value: b.low ?? 0, color: "#22C55E" },
+    { name: "Info", value: b.info ?? 0, color: "#6B7280" },
   ];
 
   const total = data.reduce((acc, d) => acc + d.value, 0);

@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -234,11 +235,18 @@ func (s *Server) startCampaign(c *fiber.Ctx) error {
 		s.runner.Run(ctx, cc, func(event pipeline.CampaignEvent) {
 			state.Events = append(state.Events, event)
 
-			// Track findings
+			// Track findings. The runner now includes the full
+			// ClassifiedFinding in event.Data, so severity, CVSS, and
+			// target all flow through to the dashboard / stats endpoint.
 			if event.EventType == pipeline.EventFindingDiscovered {
-				state.Findings = append(state.Findings, pipeline.ClassifiedFinding{
-					Title: event.Detail,
-				})
+				var f pipeline.ClassifiedFinding
+				if len(event.Data) > 0 && json.Unmarshal(event.Data, &f) == nil {
+					state.Findings = append(state.Findings, f)
+				} else {
+					state.Findings = append(state.Findings, pipeline.ClassifiedFinding{
+						Title: event.Detail,
+					})
+				}
 			}
 
 			// Track status changes
@@ -314,6 +322,14 @@ func (s *Server) getStats(c *fiber.Ctx) error {
 	total := 0
 	active := 0
 	totalFindings := 0
+	bySeverity := map[pipeline.Severity]int{
+		pipeline.SeverityCritical: 0,
+		pipeline.SeverityHigh:     0,
+		pipeline.SeverityMedium:   0,
+		pipeline.SeverityLow:      0,
+		pipeline.SeverityInformational:     0,
+	}
+	byAgent := map[string]int{}
 
 	s.campaigns.Range(func(key, value any) bool {
 		state := value.(*CampaignState)
@@ -325,6 +341,14 @@ func (s *Server) getStats(c *fiber.Ctx) error {
 			active++
 		}
 		totalFindings += len(state.Findings)
+		for _, f := range state.Findings {
+			bySeverity[f.Severity]++
+		}
+		for _, e := range state.Events {
+			if e.AgentName != "" {
+				byAgent[e.AgentName]++
+			}
+		}
 		return true
 	})
 
@@ -332,6 +356,14 @@ func (s *Server) getStats(c *fiber.Ctx) error {
 		"campaigns":        total,
 		"active_campaigns": active,
 		"total_findings":   totalFindings,
+		"by_severity": fiber.Map{
+			"critical": bySeverity[pipeline.SeverityCritical],
+			"high":     bySeverity[pipeline.SeverityHigh],
+			"medium":   bySeverity[pipeline.SeverityMedium],
+			"low":      bySeverity[pipeline.SeverityLow],
+			"info":     bySeverity[pipeline.SeverityInformational],
+		},
+		"by_agent": byAgent,
 	})
 }
 

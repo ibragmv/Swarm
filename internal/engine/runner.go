@@ -225,8 +225,20 @@ func (r *Runner) Run(ctx context.Context, cc CampaignConfig, onEvent EventCallba
 	}
 
 	for _, f := range findingSet.Findings {
-		emit(pipeline.EventFindingDiscovered, "classifier",
-			fmt.Sprintf("[%s] %s (CVSS: %.1f) on %s", strings.ToUpper(string(f.Severity)), f.Title, f.CVSSScore, f.Target))
+		// Carry the full finding in event.Data so the API / dashboard can
+		// render severity and CVSS without re-parsing the detail string.
+		data, _ := json.Marshal(f)
+		if onEvent != nil {
+			onEvent(pipeline.CampaignEvent{
+				ID:         uuid.New(),
+				CampaignID: campaignID,
+				Timestamp:  time.Now(),
+				EventType:  pipeline.EventFindingDiscovered,
+				AgentName:  "classifier",
+				Detail:     fmt.Sprintf("[%s] %s (CVSS: %.1f) on %s", strings.ToUpper(string(f.Severity)), f.Title, f.CVSSScore, f.Target),
+				Data:       data,
+			})
+		}
 	}
 
 	emit(pipeline.EventToolResult, "classifier", fmt.Sprintf("Classified %d findings (%d filtered as FP). Severity: %d critical, %d high, %d medium",

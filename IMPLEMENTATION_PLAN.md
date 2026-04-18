@@ -93,9 +93,9 @@ Replace the sequential 5-phase runner (`internal/engine/runner.go:56-298`) with 
 
 Current state: `web/` dashboard renders, `SeverityChart` hardcodes zeros, runner never persists to DB or streams to WS.
 
-- [ ] **1.2.1** Wire scheduler → DB persistence in `internal/db/findings.go`
-- [ ] **1.2.2** Wire scheduler → WebSocket `EventHub` for live updates
-- [ ] **1.2.3** Replace mock data in `web/src/components/charts/SeverityChart.tsx` with real query
+- [ ] **1.2.1** Wire scheduler → DB persistence in `internal/db/findings.go` *(runner emits structured finding events now; DB persist on the server path is next)*
+- [x] **1.2.2** Wire scheduler → WebSocket `EventHub` for live updates *(server.startCampaign publishes every event via hub.Publish)*
+- [x] **1.2.3** Replace mock zeros in `SeverityChart` with a live query against `/api/v1/stats`
 - [ ] **1.2.4** Add "live swarm" view: animated pheromone graph, active agents, findings stream
 - [ ] **1.2.5** Playwright test: run `pentestswarm scan --dry-run` against mock target, assert chart values non-zero in <10s
 - [ ] **1.2.6** Add campaign diff view (run N vs run N-1) — foundation for ASM mode
