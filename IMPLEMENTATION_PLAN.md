@@ -79,9 +79,9 @@ Replace the sequential 5-phase runner (`internal/engine/runner.go:56-298`) with 
   - [x] Per-agent concurrency caps
   - [x] Graceful shutdown on SIGINT via runCtx cancellation
   - [x] Campaign-level budget (agent-hours + tokens) enforced by the budget watcher
-- [ ] **1.1.6** Pheromone tuning
-  - [ ] Per-finding-type decay half-lives in `config/pheromones.yaml`
-  - [ ] CLI flag `--exploration-bias {low,med,high}` — scales new-vs-known weight
+- [x] **1.1.6** Pheromone tuning
+  - [x] Per-finding-type decay half-lives in `config/pheromones.yaml` (embedded default + override via `Load`)
+  - [x] CLI flag `--exploration-bias {low,med,high}` — scales pheromone base at write time
 - [ ] **1.1.7** Delete `internal/engine/runner.go` sequential pipeline (keep a `legacy` subcommand behind `--legacy` flag for 1 release)
 - [ ] **1.1.8** Integration test: deterministic seed, verify 3 agents interact through blackboard, final state matches golden file
 - [ ] **1.1.9** Observability

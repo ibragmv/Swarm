@@ -15,6 +15,7 @@ import (
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/swarm"
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/swarm/agents"
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/swarm/blackboard"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/swarm/tuning"
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/tools"
 	"github.com/google/uuid"
 )
@@ -123,13 +124,18 @@ func (r *Runner) RunSwarm(ctx context.Context, cc CampaignConfig, onEvent EventC
 		cc.DryRun,
 	)
 
+	// Pheromone tuning: config file if present, else embedded defaults.
+	// --exploration-bias on the CLI applies a multiplier at lookup time.
+	tuningSettings, _ := tuning.Load("config/pheromones.yaml")
+	tuningSettings = tuningSettings.WithBias(tuning.Bias(cc.ExplorationBias))
+
 	swarmAgents := []swarm.Agent{
 		agents.NewReconAgent(reconInner, &scope.ScopeDefinition{
 			AllowedDomains: scopeDef.AllowedDomains,
 			AllowedCIDRs:   scopeDef.AllowedCIDRs,
-		}, campaignID, 1),
+		}, campaignID, 1, tuningSettings),
 		agents.NewClassifierAgent(classifierInner, campaignID, 3),
-		agents.NewExploitAgent(exploitInner, executor, cc.Objective, campaignID, 2, cc.DryRun),
+		agents.NewExploitAgent(exploitInner, executor, cc.Objective, campaignID, 2, cc.DryRun, tuningSettings),
 		agents.NewReportAgent(reportInner, renderer, campaign, cc.OutputDir, cc.Format,
 			func(paths map[string]string) {
 				for k, p := range paths {
@@ -159,7 +165,7 @@ func (r *Runner) RunSwarm(ctx context.Context, cc CampaignConfig, onEvent EventC
 	}
 
 	// Seed the swarm. Without this nothing triggers.
-	if err := agents.Seed(ctx, board, campaignID, cc.Target, cc.Objective); err != nil {
+	if err := agents.Seed(ctx, board, campaignID, cc.Target, cc.Objective, tuningSettings); err != nil {
 		return fmt.Errorf("seed swarm: %w", err)
 	}
 	emit(pipeline.EventThought, "orchestrator", fmt.Sprintf("Swarm deployed against %s", cc.Target))

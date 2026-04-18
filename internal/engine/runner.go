@@ -33,6 +33,10 @@ type CampaignConfig struct {
 	Format    string
 	Provider  string // override config provider
 	APIKey    string // override config API key
+
+	// ExplorationBias scales pheromone weights in the swarm path.
+	// "", "med" = default (1.0×); "low" = 0.7× (depth-first); "high" = 1.3× (breadth-first).
+	ExplorationBias string
 }
 
 // EventCallback is called for every campaign event (for TUI/streaming).

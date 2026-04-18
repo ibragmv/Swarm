@@ -8,8 +8,15 @@ import (
 	reconpkg "github.com/Armur-Ai/Pentest-Swarm-AI/internal/agent/recon"
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/scope"
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/swarm/blackboard"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/swarm/tuning"
 	"github.com/google/uuid"
 )
+
+// interestingEndpointType is a virtual finding-type used only for tuning
+// lookup — katana-flagged "interesting" endpoints get their own pheromone
+// row so they surface to downstream agents faster. On the wire they're
+// still written as blackboard.TypeHTTPEndpoint.
+const interestingEndpointType blackboard.FindingType = "HTTP_ENDPOINT_INTERESTING"
 
 // ReconAgent wakes on TARGET_REGISTERED and publishes one finding per
 // discovered subdomain / port / endpoint / technology. Batched tool
@@ -21,14 +28,19 @@ type ReconAgent struct {
 	scopeDef   *scope.ScopeDefinition
 	campaignID uuid.UUID
 	parallel   int
+	tun        *tuning.Settings
 }
 
 // NewReconAgent constructs a swarm wrapper around the existing recon agent.
-func NewReconAgent(inner *reconpkg.ReconAgent, scopeDef *scope.ScopeDefinition, campaignID uuid.UUID, parallel int) *ReconAgent {
+// Pass nil for tun to get the baked-in default pheromone tuning.
+func NewReconAgent(inner *reconpkg.ReconAgent, scopeDef *scope.ScopeDefinition, campaignID uuid.UUID, parallel int, tun *tuning.Settings) *ReconAgent {
 	if parallel <= 0 {
 		parallel = 1
 	}
-	return &ReconAgent{recon: inner, scopeDef: scopeDef, campaignID: campaignID, parallel: parallel}
+	if tun == nil {
+		tun = tuning.Default()
+	}
+	return &ReconAgent{recon: inner, scopeDef: scopeDef, campaignID: campaignID, parallel: parallel, tun: tun}
 }
 
 // Name implements swarm.Agent.
@@ -50,43 +62,47 @@ func (a *ReconAgent) Handle(ctx context.Context, f blackboard.Finding, board bla
 		return fmt.Errorf("recon execute: %w", err)
 	}
 
-	write := func(t blackboard.FindingType, target string, payload any, pheromone float64, halfLife int) {
+	// Every write pulls its pheromone from the tuning table so operators
+	// can steer the swarm via config/pheromones.yaml + --exploration-bias.
+	write := func(t blackboard.FindingType, onWire blackboard.FindingType, target string, payload any) {
+		if onWire == "" {
+			onWire = t
+		}
+		base, half := a.tun.Lookup(t)
 		data, _ := json.Marshal(payload)
 		_, _ = board.Write(ctx, blackboard.Finding{
 			CampaignID:    a.campaignID,
 			AgentName:     a.Name(),
-			Type:          t,
+			Type:          onWire,
 			Target:        target,
 			Data:          data,
-			PheromoneBase: pheromone,
-			HalfLifeSec:   halfLife,
+			PheromoneBase: base,
+			HalfLifeSec:   half,
 		})
 	}
 
 	for _, sd := range surface.Subdomains {
-		write(blackboard.TypeSubdomain, sd.Domain, sd, 0.7, 7200)
+		write(blackboard.TypeSubdomain, "", sd.Domain, sd)
 	}
 	for _, host := range surface.Hosts {
 		for _, port := range host.OpenPorts {
-			write(blackboard.TypePortOpen, fmt.Sprintf("%s:%d", host.IP, port),
-				map[string]any{"ip": host.IP, "port": port, "service": host.Services[port]},
-				0.8, 3600)
+			write(blackboard.TypePortOpen, "", fmt.Sprintf("%s:%d", host.IP, port),
+				map[string]any{"ip": host.IP, "port": port, "service": host.Services[port]})
 			if svc, ok := host.Services[port]; ok && svc.Name != "" {
-				write(blackboard.TypeService, fmt.Sprintf("%s:%d/%s", host.IP, port, svc.Name),
-					svc, 0.8, 3600)
+				write(blackboard.TypeService, "", fmt.Sprintf("%s:%d/%s", host.IP, port, svc.Name), svc)
 			}
 		}
 	}
 	for _, ep := range surface.Endpoints {
-		pheromone := 0.6
+		tuneKey := blackboard.TypeHTTPEndpoint
 		if ep.Interesting {
-			pheromone = 0.9
+			tuneKey = interestingEndpointType
 		}
-		write(blackboard.TypeHTTPEndpoint, ep.URL, ep, pheromone, 7200)
+		write(tuneKey, blackboard.TypeHTTPEndpoint, ep.URL, ep)
 	}
 	for tech, version := range surface.Technologies {
-		write(blackboard.TypeTechnology, tech,
-			map[string]string{"technology": tech, "version": version}, 0.5, 7200)
+		write(blackboard.TypeTechnology, "", tech,
+			map[string]string{"technology": tech, "version": version})
 	}
 
 	return nil
