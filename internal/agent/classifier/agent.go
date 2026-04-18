@@ -16,14 +16,35 @@ import (
 type ClassifierAgent struct {
 	provider llm.Provider
 	fpFilter *FPFilter
+	strict   bool
+	onErr    func(error)
+}
+
+// Option customises ClassifierAgent construction.
+type Option func(*ClassifierAgent)
+
+// WithStrict makes any LLM error fatal (Classify returns the error instead
+// of silently falling back to heuristic classification).
+func WithStrict() Option {
+	return func(c *ClassifierAgent) { c.strict = true }
+}
+
+// WithErrorSink installs a callback invoked on LLM / parse errors. Useful
+// for surfacing degraded-mode warnings to the event stream.
+func WithErrorSink(fn func(error)) Option {
+	return func(c *ClassifierAgent) { c.onErr = fn }
 }
 
 // NewClassifierAgent creates a new classifier agent.
-func NewClassifierAgent(provider llm.Provider) *ClassifierAgent {
-	return &ClassifierAgent{
+func NewClassifierAgent(provider llm.Provider, opts ...Option) *ClassifierAgent {
+	c := &ClassifierAgent{
 		provider: provider,
 		fpFilter: NewFPFilter(),
 	}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
 }
 
 // Classify takes raw findings and produces classified, scored, ranked findings.
@@ -65,7 +86,13 @@ func (c *ClassifierAgent) Classify(ctx context.Context, campaignID uuid.UUID, ra
 		batch := classified[i:end]
 		enriched, err := c.classifyBatch(ctx, batch)
 		if err != nil {
-			// On LLM failure, keep the heuristic classification
+			if c.strict {
+				return nil, fmt.Errorf("classifier batch %d-%d: %w", i, end, err)
+			}
+			if c.onErr != nil {
+				c.onErr(fmt.Errorf("classifier degraded for batch %d-%d: %w", i, end, err))
+			}
+			// Heuristic classification stands; continue with next batch.
 			continue
 		}
 

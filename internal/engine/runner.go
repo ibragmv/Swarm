@@ -164,7 +164,16 @@ func (r *Runner) Run(ctx context.Context, cc CampaignConfig, onEvent EventCallba
 	emit(pipeline.EventThought, "orchestrator", fmt.Sprintf("Starting reconnaissance on %s", cc.Target))
 
 	coordinator := tools.NewCoordinator()
-	reconAgent := recon.NewReconAgent(provider, coordinator)
+
+	reconOpts := []recon.Option{
+		recon.WithErrorSink(func(err error) {
+			emit(pipeline.EventError, "recon", err.Error())
+		}),
+	}
+	if r.strict {
+		reconOpts = append(reconOpts, recon.WithStrict())
+	}
+	reconAgent := recon.NewReconAgent(provider, coordinator, reconOpts...)
 	reconPlan := reconAgent.PlanRecon(cc.Target)
 
 	emit(pipeline.EventToolCall, "recon", fmt.Sprintf("Running tools: %s", strings.Join(reconPlan.ToolOrder, ", ")))
@@ -189,7 +198,15 @@ func (r *Runner) Run(ctx context.Context, cc CampaignConfig, onEvent EventCallba
 
 	emit(pipeline.EventThought, "orchestrator", "Classifying findings — mapping CVEs, scoring CVSS, filtering false positives")
 
-	classifierAgent := classifier.NewClassifierAgent(provider)
+	classifierOpts := []classifier.Option{
+		classifier.WithErrorSink(func(err error) {
+			emit(pipeline.EventError, "classifier", err.Error())
+		}),
+	}
+	if r.strict {
+		classifierOpts = append(classifierOpts, classifier.WithStrict())
+	}
+	classifierAgent := classifier.NewClassifierAgent(provider, classifierOpts...)
 
 	// Build raw findings from attack surface
 	rawFindings := extractRawFindings(surface, campaignID)

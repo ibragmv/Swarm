@@ -17,14 +17,34 @@ import (
 type ReconAgent struct {
 	provider    llm.Provider
 	coordinator *tools.Coordinator
+	strict      bool
+	onErr       func(error)
+}
+
+// Option customises ReconAgent construction.
+type Option func(*ReconAgent)
+
+// WithStrict makes LLM failures fatal instead of returning a partial surface.
+func WithStrict() Option {
+	return func(r *ReconAgent) { r.strict = true }
+}
+
+// WithErrorSink installs a callback for LLM / parse errors. Useful for
+// emitting degraded-mode warnings to the event stream.
+func WithErrorSink(fn func(error)) Option {
+	return func(r *ReconAgent) { r.onErr = fn }
 }
 
 // NewReconAgent creates a new recon agent.
-func NewReconAgent(provider llm.Provider, coordinator *tools.Coordinator) *ReconAgent {
-	return &ReconAgent{
+func NewReconAgent(provider llm.Provider, coordinator *tools.Coordinator, opts ...Option) *ReconAgent {
+	r := &ReconAgent{
 		provider:    provider,
 		coordinator: coordinator,
 	}
+	for _, opt := range opts {
+		opt(r)
+	}
+	return r
 }
 
 // ReconPlan defines which tools to run based on target type.
@@ -129,7 +149,13 @@ func (r *ReconAgent) Analyze(ctx context.Context, results []*tools.ToolResult, c
 
 		surface, err = ParseAttackSurface(retryResp.Content)
 		if err != nil {
-			// Return partial results rather than error
+			if r.strict {
+				return nil, fmt.Errorf("recon parse failed after retry: %w", err)
+			}
+			if r.onErr != nil {
+				r.onErr(fmt.Errorf("recon analysis returned empty surface: %w", err))
+			}
+			// Return partial results rather than error (degraded mode).
 			return &pipeline.AttackSurface{
 				CampaignID: campaignID,
 				CreatedAt:  time.Now(),

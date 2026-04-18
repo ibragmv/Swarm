@@ -111,7 +111,11 @@ func runScan(cmd *cobra.Command, args []string) error {
 	}
 
 	// Run the campaign
-	runner := engine.NewRunner(cfg)
+	var runnerOpts []engine.Option
+	if strict, _ := cmd.Flags().GetBool("strict"); strict {
+		runnerOpts = append(runnerOpts, engine.WithStrictLLM())
+	}
+	runner := engine.NewRunner(cfg, runnerOpts...)
 	if err := runner.Run(ctx, cc, onEvent); err != nil {
 		if ctx.Err() != nil {
 			fmt.Println(colorRed("\nCampaign aborted by user."))
@@ -187,6 +191,7 @@ func init() {
 	scanCmd.Flags().String("output", "./reports", "output directory for report")
 	scanCmd.Flags().String("format", "md", "report format: md|html|json|all")
 	scanCmd.Flags().Bool("follow", false, "stream live output (default when interactive)")
+	scanCmd.Flags().Bool("strict", false, "abort on any LLM error instead of degrading to heuristics")
 	scanCmd.Flags().String("auth-token", "", "authorization token")
 
 	_ = scanCmd.MarkFlagRequired("scope")
