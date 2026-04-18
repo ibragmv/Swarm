@@ -11,6 +11,7 @@ import (
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/config"
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/pipeline"
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/plugins"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/tools"
 	"github.com/spf13/cobra"
 )
 
@@ -120,11 +121,20 @@ var playbookValidateCmd = &cobra.Command{
 		pb, err := plugins.LoadPlaybook(args[0])
 		if err != nil {
 			fmt.Printf("  %s %s\n", colorRed("[INVALID]"), err)
+			return fmt.Errorf("parse failed")
+		}
+		report := plugins.Validate(pb, tools.NewCoordinator().AvailableTools())
+		if report.OK() {
+			fmt.Printf("  %s %s (%d phases, %d variables)\n",
+				colorGreen("[VALID]"), pb.Name, len(pb.Phases), len(pb.Variables))
+			if len(report.Warnings) > 0 {
+				fmt.Println(report.Format())
+			}
 			return nil
 		}
-		fmt.Printf("  %s %s (%d phases, %d variables)\n",
-			colorGreen("[VALID]"), pb.Name, len(pb.Phases), len(pb.Variables))
-		return nil
+		fmt.Printf("  %s %s\n", colorRed("[INVALID]"), pb.Name)
+		fmt.Print(report.Format())
+		return fmt.Errorf("%d error(s), %d warning(s)", len(report.Errors), len(report.Warnings))
 	},
 }
 

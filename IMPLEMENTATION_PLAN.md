@@ -207,7 +207,10 @@ Ship as YAML files in `playbooks/` — like Nuclei templates but for full swarm 
 - [x] **2.3.3** `playbooks/ci-cd-security.yaml`
 - [x] **2.3.4** `playbooks/internal-network.yaml`
 - [x] **2.3.5** `playbooks/ctf-solver.yaml`
-- [ ] **2.3.6** Playbook schema + validator (`internal/playbook/schema.go`)
+- [x] **2.3.6** Playbook schema + validator (`internal/plugins/validate.go`)
+  - Name + version-semver check, duplicate-phase detection, variable-type whitelist, tool-known check, `{{ var }}` reference to undeclared variables fails, `required + default` combo warns
+  - CLI `pentestswarm playbook validate <path>` now reports full error/warning lists with exit code on errors
+  - 9 unit tests cover each rule
 - [x] **2.3.7** `pentestswarm playbook run <name>` CLI wiring *(already in `cli/playbook.go`)*
 - [ ] **2.3.8** "Playbook marketplace" page on site (v1: just a listing; v2: submit PRs)
 
