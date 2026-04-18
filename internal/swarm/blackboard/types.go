@@ -40,6 +40,9 @@ const (
 	// Meta findings
 	TypeCampaignComplete FindingType = "CAMPAIGN_COMPLETE"
 	TypeAgentError       FindingType = "AGENT_ERROR"
+
+	// Generated artefacts — nuclei templates, playbook drafts, etc.
+	TypeNucleiTemplateDraft FindingType = "NUCLEI_TEMPLATE_DRAFT"
 )
 
 // Finding is a single atomic piece of shared state on the blackboard.

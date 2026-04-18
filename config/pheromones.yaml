@@ -73,6 +73,10 @@ types:
     base: 1.0
     half_life_sec: 300
 
+  NUCLEI_TEMPLATE_DRAFT:
+    base: 0.8
+    half_life_sec: 43200      # 12h — drafts stay interesting for a reviewer's workday
+
 # Optional catch-all used when a type is not listed above.
 default:
   base: 0.5

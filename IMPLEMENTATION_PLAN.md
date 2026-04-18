@@ -192,9 +192,11 @@ Current state: `web/` dashboard renders, `SeverityChart` hardcodes zeros, runner
   - [x] Client at `internal/integrations/zap/client.go` with API-key query param
   - [x] Spider + active-scan primitives, status polling, alerts endpoint
   - [x] 5 unit tests (spider + active lifecycle, alert parsing, API-key enforcement, URL encoding regression)
-- [ ] **2.2.4** **Nuclei template author agent**
-  - [ ] LLM generates candidate nuclei templates from novel findings
-  - [ ] Auto-test against a known-safe corpus before writing to community templates
+- [x] **2.2.4** **Nuclei template author agent**
+  - [x] `NucleiAuthorAgent` triggers on high-pheromone novel findings (no CVE match), uses structured tool-use (`emit_nuclei_template`) so output is always parseable
+  - [x] Drafts land at `./drafts/nuclei/<id>-<hash>.yaml` for human review
+  - [x] Optional `-validate` pass via the nuclei binary when present; rejects ill-formed drafts before publishing
+  - [x] `NUCLEI_TEMPLATE_DRAFT` finding type added to blackboard + tuning (12h half-life for reviewer workday)
 
 ### Phase 2.3 — Swarm Playbooks (Named Pipelines)
 
