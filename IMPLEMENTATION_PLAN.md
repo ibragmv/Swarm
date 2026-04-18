@@ -177,11 +177,11 @@ Current state: `web/` dashboard renders, `SeverityChart` hardcodes zeros, runner
 
 ### Phase 2.2 — Heavyweight Integrations
 
-- [ ] **2.2.1** **Burp Suite MCP** bridge (official PortSwigger MCP)
-  - [ ] Discover Burp via MCP client
-  - [ ] Expose Burp scan results as blackboard findings
-  - [ ] Allow swarm to request Burp active scan on a specific endpoint
-  - [ ] This is a flagship differentiator — no competitor has a clean Burp integration
+- [x] **2.2.1** **Burp Suite MCP** bridge (official PortSwigger MCP)
+  - [x] JSON-RPC 2.0 HTTP client at `internal/integrations/burp/client.go` with bearer auth
+  - [x] Burp tool constants + helpers: `StartActiveScan`, `GetIssues`, `ListTools`, `Ping`
+  - [x] Swarm agent `agents.BurpAgent` triggers on `HTTP_ENDPOINT` findings above 0.5 pheromone, publishes Burp issues as `CVE_MATCH`
+  - [x] 5 unit tests use httptest-backed JSON-RPC server, so CI runs with no Burp install
 - [ ] **2.2.2** **Metasploit** via MSGRPC
   - [ ] Module search + execution
   - [ ] Session management (kept out of LLM context; referenced by handle)
