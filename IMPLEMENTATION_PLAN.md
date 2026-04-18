@@ -188,9 +188,10 @@ Current state: `web/` dashboard renders, `SeverityChart` hardcodes zeros, runner
   - [x] `module.execute`, `session.list`, `session.stop`, `job.stop` primitives
   - [x] 5 unit tests use httptest-backed fake msfrpcd; covers token refresh, session lifecycle
   - [ ] Swarm agent that registers every session with the cleanup registry (follow-up, needs an exploit-agent extension)
-- [ ] **2.2.3** **OWASP ZAP** REST API
-  - [ ] Spider + active scan triggers
-  - [ ] Consume ZAP alerts as findings
+- [x] **2.2.3** **OWASP ZAP** REST API
+  - [x] Client at `internal/integrations/zap/client.go` with API-key query param
+  - [x] Spider + active-scan primitives, status polling, alerts endpoint
+  - [x] 5 unit tests (spider + active lifecycle, alert parsing, API-key enforcement, URL encoding regression)
 - [ ] **2.2.4** **Nuclei template author agent**
   - [ ] LLM generates candidate nuclei templates from novel findings
   - [ ] Auto-test against a known-safe corpus before writing to community templates
