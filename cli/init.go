@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/keychain"
@@ -48,6 +49,64 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	printToolReport()
+	if err := writeMinimalConfig(force); err != nil {
+		return err
+	}
+	fmt.Println()
+	fmt.Println(colorGreen("  Setup complete.") + " Next:")
+	fmt.Println("    " + colorCyan("pentestswarm scan example.com --scope example.com --swarm"))
+	fmt.Println()
+	return nil
+}
+
+// writeMinimalConfig writes ~/.pentestswarm/config.yaml if one doesn't
+// exist. The API key is NOT written into this file — it lives in the
+// keychain. Everything here is safe to commit accidentally.
+func writeMinimalConfig(force bool) error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("home dir: %w", err)
+	}
+	dir := filepath.Join(home, ".pentestswarm")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("mkdir %s: %w", dir, err)
+	}
+	path := filepath.Join(dir, "config.yaml")
+
+	if _, err := os.Stat(path); err == nil && !force {
+		fmt.Printf("\n  %s  Config already exists at %s\n", colorGreen("[keep]"), colorCyan(path))
+		return nil
+	}
+
+	data := `# Pentest Swarm AI — configuration.
+# The API key is NOT in this file — it lives in the OS keychain.
+# This file is safe to commit.
+
+orchestrator:
+  provider: claude
+  model: claude-sonnet-4-6
+  context_window: 200000
+  max_tokens: 8192
+  temperature: 0.1
+
+# Per-agent model overrides. Blank = inherit from orchestrator.
+# agents:
+#   exploit:
+#     model: claude-opus-4-7      # reasoning-heavy agent on the smart model
+#   classifier:
+#     model: claude-haiku-4-5-20251001   # cheap model for volume classification
+
+scope:
+  enforce_strict: true
+
+logging:
+  level: info
+  format: console
+`
+	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
+		return fmt.Errorf("write config: %w", err)
+	}
+	fmt.Printf("\n  %s  Config written to %s\n", colorGreen("[ok]"), colorCyan(path))
 	return nil
 }
 
