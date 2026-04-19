@@ -34,13 +34,7 @@
 
 
 <p align="center">
-  <em>Live campaign simulation (ASCII banner, live progress bars, colored severity stream, attack-chain execution):</em><br>
   <img src="docs/demo-flashy.gif" alt="Pentest Swarm AI — live campaign demo" width="900">
-</p>
-
-<p align="center">
-  <em>CLI surface — help, system health, scan flags:</em><br>
-  <img src="docs/demo.gif" alt="Pentest Swarm AI — CLI surface" width="900">
 </p>
 
 <p align="center">
@@ -254,7 +248,7 @@ Regenerate the demo GIF after any CLI change:
 
 ```bash
 brew install vhs      # one-off
-vhs docs/demo.tape
+vhs docs/demo-flashy.tape
 ```
 
 ---
