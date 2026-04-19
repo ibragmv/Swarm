@@ -16,9 +16,9 @@ Set Theme "Dracula"
 Set TypingSpeed 30ms
 Set PlaybackSpeed 1.0
 Set WindowBar Colorful
-Set Margin 16
-Set MarginFill "#1a1a2e"
-Set BorderRadius 8
+Set Margin 20
+Set MarginFill "#674EFF"
+Set BorderRadius 10
 Set LineHeight 1.15
 Set LetterSpacing 0.5
 
