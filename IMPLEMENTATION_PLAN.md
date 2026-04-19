@@ -1,7 +1,7 @@
 # Pentest Swarm AI — Implementation Plan
 
-> **Status**: Draft v1 — planning horizon ~6 months
-> **Last updated**: 2026-04-18
+> **Status**: v2 — planning horizon ~6 months
+> **Last updated**: 2026-04-19
 > **Owner**: @AkhilSharma90
 
 This document is the source of truth for the roadmap from v0.1 (current) to v1.0. Every task is scoped small enough to land in a single PR. Check boxes as you ship.
@@ -16,11 +16,12 @@ If you're a contributor looking for where to help: look for `P0` (blocking) and 
 2. [Wave 1 — Credibility Debt (4–6 weeks)](#wave-1--credibility-debt-46-weeks)
 3. [Wave 2 — Integrations & Workflows (6–8 weeks)](#wave-2--integrations--workflows-68-weeks)
 4. [Wave 3 — Research Frontier (ongoing)](#wave-3--research-frontier-ongoing)
-5. [Distribution & Community Growth](#distribution--community-growth)
-6. [README Rewrite](#readme-rewrite)
-7. [Architectural Decisions](#architectural-decisions)
-8. [Benchmarks Target](#benchmarks-target)
-9. [Research References](#research-references)
+5. [Wave 4 — Researcher Workflow: The XBOW-for-Bug-Bounty Play (6–8 weeks)](#wave-4--researcher-workflow-the-xbow-for-bug-bounty-play-68-weeks)
+6. [Distribution & Community Growth](#distribution--community-growth)
+7. [README Rewrite](#readme-rewrite)
+8. [Architectural Decisions](#architectural-decisions)
+9. [Benchmarks Target](#benchmarks-target)
+10. [Research References](#research-references)
 
 ---
 
@@ -28,7 +29,9 @@ If you're a contributor looking for where to help: look for `P0` (blocking) and 
 
 **Goal**: Pentest Swarm AI is the first open-source pentesting tool that is a *real swarm* — decentralized agents coordinating through shared environment state (stigmergy), producing emergent attack paths no single planner specified.
 
-**Non-goals (v1)**: replacing human pentesters; autonomous zero-day discovery (XBOW/Big Sleep territory); web-only scope.
+**Non-goals (v1)**: replacing human pentesters; web-only scope.
+
+**Long-arc vision (Wave 4)**: a bug-bounty researcher runs **one command** against a HackerOne program they've been accepted to and gets a list of verified, reproducible vulnerabilities with ready-to-submit writeups. Same one-command experience XBOW sells as a SaaS, open-sourced. If researchers file real vulns with this tool, everything else follows — stars, contributors, signal in the market.
 
 **Moat vs. competitors**:
 - vs. **PentestGPT**: we execute, not just suggest
@@ -292,6 +295,111 @@ Memory poisoning and inter-agent-comm attacks are real. Be the first tool to mar
 
 ---
 
+## Wave 4 — Researcher Workflow: The XBOW-for-Bug-Bounty Play (6–8 weeks)
+
+> **The goal of this wave is the only thing that actually matters for adoption:** a real researcher should be able to `brew install`, point the tool at a HackerOne program they've been accepted to, and walk away with a shortlist of verified, reproducible vulnerabilities they can paste straight into the platform's submission form.
+>
+> XBOW built this as a commercial SaaS and drove its brand off a public HackerOne leaderboard. Our job is to match the experience (one command, real bounties) and beat them on friction (zero setup, zero cost floor, local control of data). Every task in this wave is judged against one question: "Does this make it more likely that a researcher reports a real vuln found via this tool in the next 30 days?"
+>
+> Everything in earlier waves feeds this. Everything in this wave is user-facing.
+
+### Phase 4.1 — Frictionless Onboarding
+
+Zero-to-first-scan under 60 seconds.
+
+- [ ] **4.1.1** `pentestswarm init` — interactive, one-shot setup
+  - Prompt for Claude API key; store in the OS keychain (macOS Keychain / linux-secret-service / Windows Credential Manager) rather than a plaintext YAML
+  - Probe for `nmap`, `sqlmap`, `nuclei`, etc.; print a one-screen report of what's available vs. what to install
+  - Write a minimal `~/.pentestswarm/config.yaml` with sensible defaults
+- [ ] **4.1.2** First-run bootstrap: if `scan` is invoked without config, prompt once ("No API key found — paste it here or Ctrl-C to configure later") instead of failing with a stack trace
+- [ ] **4.1.3** One-line installer: `curl -sSL https://install.pentestswarm.ai | sh` — fetches the matching release binary, verifies the checksum, puts it on PATH, runs `init`
+- [ ] **4.1.4** Homebrew tap repo at `Armur-Ai/homebrew-tap` — GoReleaser renders the formula from `deploy/homebrew/pentestswarm.rb.template` on every tagged release
+- [ ] **4.1.5** "Zero to First Finding in 60 seconds" landing page — one-minute screencast + three copyable commands; linked at the top of the README
+- [ ] **4.1.6** Bundled Docker image `armurai/pentest-swarm:research` with nmap + sqlmap + the ProjectDiscovery stack pre-installed, so no external deps needed
+- [ ] **4.1.7** `pentestswarm doctor --fix` auto-installs missing tools it can install safely (ProjectDiscovery Go binaries via `go install`; nmap / sqlmap delegate to brew/apt)
+
+### Phase 4.2 — HackerOne + Bugcrowd Scope Auto-Import
+
+No one should have to hand-type a 200-asset scope list.
+
+- [ ] **4.2.1** `pentestswarm scope import h1 <program-slug>` — pulls in-scope assets from HackerOne's API (if the researcher has a token) or via public program JSON; writes `scope.yaml` ready to consume
+- [ ] **4.2.2** `pentestswarm scope import bugcrowd <program-slug>` — Bugcrowd equivalent
+- [ ] **4.2.3** `pentestswarm scope import intigriti <program-slug>`
+- [ ] **4.2.4** `pentestswarm scope import synack <program-slug>` (if API available)
+- [ ] **4.2.5** Credential-per-program config — per-program API tokens stored in the keychain; `scan --program h1:my-program` auto-picks the right token + scope + report template
+- [ ] **4.2.6** Scope diff command: `pentestswarm scope diff <prev.yaml> <current.yaml>` → used by ASM mode to flag newly-added assets that became in-scope overnight
+- [ ] **4.2.7** Scope drift guard: if a program **removes** an asset mid-campaign, abort in-flight scans against that asset within 5s and mark as out-of-scope
+
+### Phase 4.3 — Verified-PoC Gate (The Signal-vs-Noise Moat)
+
+XBOW's reputation rides on low false-positive rate. So does ours.
+
+- [ ] **4.3.1** Every finding must carry a `reproduce` field — either a shell command, an HTTP request, or a Burp-repeater-ready file
+- [ ] **4.3.2** `ConfirmationAgent` swarm agent: after the exploit agent publishes a finding, this agent re-runs the reproduction from a freshly-rotated IP (outbound proxy) to prove the vuln isn't an artefact of state. On failure to reproduce, pheromone drops to 0.1 and the finding is filtered from the final report.
+- [ ] **4.3.3** "Cross-validation" — the same suspected vuln is fired against by two different tools (e.g. nuclei + sqlmap for SQLi); we only publish findings that at least two tools agree on, OR one tool plus a successful PoC
+- [ ] **4.3.4** False-positive feedback loop: in the generated report, each finding has a one-click "mark as FP" link. When clicked, the pattern is persisted to `~/.pentestswarm/fp-cache.jsonl` and future scans of the same pattern are suppressed
+- [ ] **4.3.5** CVSS sanity-check: classifier's CVSS is cross-referenced against NVD + CIRCL CVE-search. Mismatch > 2.0 points downgrades confidence to `unverified`
+- [ ] **4.3.6** Two report modes: `--mode bugbounty` (default — only publishes reproduced findings) and `--mode aggressive` (includes suspected-but-unverified, with a banner saying so)
+
+### Phase 4.4 — Report & Submission Automation
+
+Turn a campaign into a ready-to-paste submission.
+
+- [ ] **4.4.1** HackerOne submission template — matches their exact structure: Summary · Steps to Reproduce · Impact · Recommendation · Severity (with CVSS vector). Template lives in `internal/agent/report/templates/hackerone.md.tmpl`
+- [ ] **4.4.2** Bugcrowd submission template (different schema: ASV, VRT category, description, proof)
+- [ ] **4.4.3** Intigriti submission template
+- [ ] **4.4.4** `pentestswarm submit --platform h1 --program <slug> --report <path> --dry-run` — renders the submission, previews it in the terminal. Real submission requires `--live` + y/n confirmation
+- [ ] **4.4.5** Auto-dedup against the researcher's own prior submissions via the H1 API — if they already filed something matching this pattern, the finding is labelled `(already filed as #123456)` in the report instead of re-submitted
+- [ ] **4.4.6** Platform-agnostic duplicate check: fuzzy-match finding title + target against the program's public disclosed reports; flag `possible_duplicate` in the UI before the researcher submits
+- [ ] **4.4.7** Report quality gate: every generated report passes through a second LLM call that grades clarity, impact framing, and reproducibility on a 0–10 rubric. Below 6 = blocked with a "polish these sections" prompt
+- [ ] **4.4.8** Evidence capture:
+  - `gowitness`-backed screenshot of every web finding embedded in the report
+  - HTTP request/response pairs saved as `.http` files (Burp-importable)
+  - For SQLi: redacted sqlmap output + the exact injection point
+- [ ] **4.4.9** `pentestswarm report polish <path>` — manual re-run of the quality gate on an existing report after a researcher's edits
+
+### Phase 4.5 — Cost + Risk Controls
+
+- [ ] **4.5.1** Pre-scan cost estimate: `pentestswarm scan ... --estimate` prints expected LLM token spend in USD (based on target-size heuristics + current Claude pricing). No packets sent.
+- [ ] **4.5.2** Running cost meter: TUI shows live `$ spent` during the scan; colour-coded when approaching budget
+- [ ] **4.5.3** Pause-on-budget: campaign pauses (not aborts) when budget is hit — researcher extends or stops. Pause also fires the report agent so partial results aren't lost
+- [ ] **4.5.4** `--safe-mode` preset for programs with "no automated scanning" clauses: caps RPS, forbids destructive techniques (no active fuzzing, no brute force, no DoS-y nuclei templates), requires per-step approval for anything that mutates state
+- [ ] **4.5.5** Program-terms parser: `pentestswarm program inspect h1:<slug>` reads the program's rules-of-engagement text, extracts constraints (rate limits, disallowed paths, must-have headers), and returns a config fragment that's auto-merged into the scan
+- [ ] **4.5.6** Bounty-per-finding estimator: classifies each finding and estimates a $ range from the program's public stats (average bounty by severity). Surfaces as a column in the final report
+- [ ] **4.5.7** Campaign ROI calculation in the report footer: expected bounty value vs. LLM spend; green if ratio >10×, yellow 2–10×, red below that
+
+### Phase 4.6 — Community Gravity (The Compounding Flywheel)
+
+Once the tool finds real bugs, word-of-mouth does more than any marketing.
+
+- [ ] **4.6.1** Public findings gallery on `pentestswarm.ai` — researchers opt-in to publish a redacted writeup once the program closes the report
+- [ ] **4.6.2** Bounty leaderboard — total $ earned with the tool, self-reported with an H1 URL as proof (manual verification for now; automated via H1 webhooks later)
+- [ ] **4.6.3** Template marketplace — share + install playbooks and nuclei templates via `pentestswarm market install <slug>`. Signed + reviewed before merging into the main `armur-templates` repo
+- [ ] **4.6.4** "Assist mode" — researcher sits at the terminal; the swarm proposes each action (e.g. "run sqlmap on /search?q=?") and waits for y/N. Lower risk of breaking program relationships, and it teaches the researcher
+- [ ] **4.6.5** Weekly office-hours Discord event — researchers bring their scans, we review live. Pure community signal, no marketing overlay
+- [ ] **4.6.6** "Shared FP" corpus — when researchers mark findings as FP (4.3.4), they can opt in to share the anonymised pattern to a central corpus so every other user's FP filter improves
+- [ ] **4.6.7** Per-program playbook tuning: community can contribute `playbooks/programs/<slug>.yaml` that layers program-specific knowledge on top of the base bug-bounty playbook (e.g. "Shopify programs: focus on GraphQL introspection, skip store.myshopify.com subdomain")
+
+### Phase 4.7 — Benchmarks That Matter to Researchers
+
+Not Cybench. The numbers bug-hunters actually care about.
+
+- [ ] **4.7.1** Public scoreboard tracking, across opt-in users: total vulns filed, total vulns triaged, total $ earned, active researchers
+- [ ] **4.7.2** Case-study page: "It found this" — before/after for public programs and retired HTB boxes, with full reproduction chains
+- [ ] **4.7.3** Triage-rate KPI: target >60% of auto-filed reports triaged as Valid within 3 months of the tool going public
+- [ ] **4.7.4** Time-to-first-finding KPI: median time from `pentestswarm init` to first verified finding — target under 15 minutes on a HackerOne program
+- [ ] **4.7.5** False-positive rate KPI: target <20% over a rolling 30-day window across all opt-in runs
+
+### Phase 4.8 — Simplicity Guards (enforced, not aspired to)
+
+- [ ] **4.8.1** "One-command" invariant: `scan` is the only command a researcher needs. Everything else is optional polish. Any PR that adds a required step to the scan flow gets rejected.
+- [ ] **4.8.2** CLI UX budget: `pentestswarm --help` must fit on one laptop screen (≤30 lines). Deprecations go below-the-fold behind `--help --all`.
+- [ ] **4.8.3** Error messages must end with a next-step: "No API key found. Run `pentestswarm init` or set `PENTESTSWARM_ORCHESTRATOR_API_KEY`." — never just an error.
+- [ ] **4.8.4** Zero-Postgres mode: the researcher flow must work with the in-memory board. Postgres is for the server/dashboard deployment only.
+- [ ] **4.8.5** `pentestswarm scan <target>` with no scope flag infers scope from the target (single-domain scope by default) — no friction for the simple case.
+
+---
+
 ## Distribution & Community Growth
 
 > Trivy, Nuclei, and Gitleaks all did these four things.
@@ -428,3 +536,4 @@ Living list — add as you read.
 ## Revision Log
 
 - **2026-04-18**: v1 draft. Wave 1 / 2 / 3 structure, Blackboard architecture, ADK decision.
+- **2026-04-19**: v2 adds **Wave 4 — Researcher Workflow**. Long-arc vision is now the XBOW-for-bug-bounty play: one command, real bounties, open source. Wave 4 is the only wave judged on whether researchers file real vulns in the 30 days after release — everything else earns its keep by feeding that outcome.
