@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/keychain"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/toolprobe"
 	"github.com/spf13/cobra"
 )
 
@@ -46,7 +47,34 @@ func runInit(cmd *cobra.Command, args []string) error {
 	if err := captureClaudeAPIKey(nonInteractive, force); err != nil {
 		return err
 	}
+	printToolReport()
 	return nil
+}
+
+// printToolReport runs the probe and renders a checklist grouped by
+// purpose. Missing tools get an install hint; present tools get a ✓.
+// The swarm works without most of these — we want the researcher to
+// know what's missing, not to block scans.
+func printToolReport() {
+	fmt.Println()
+	fmt.Println(colorBold("  Security tools on this host"))
+	for _, r := range toolprobe.Probe() {
+		fmt.Println()
+		fmt.Println("  " + colorDim(r.Group.Title))
+		for _, t := range r.Group.Tools {
+			if r.Present[t.Name] {
+				fmt.Printf("    %s %-14s %s\n",
+					colorGreen("✓"),
+					colorCyan(t.Name),
+					colorDim(t.Purpose))
+			} else {
+				fmt.Printf("    %s %-14s %s\n",
+					colorRed("✗"),
+					colorDim(t.Name),
+					colorDim(t.Purpose+"  →  "+t.InstallHint))
+			}
+		}
+	}
 }
 
 // captureClaudeAPIKey prompts for (or reads from env) the Claude API key
