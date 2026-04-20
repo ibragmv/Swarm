@@ -100,7 +100,9 @@ func TestConfirmation_HTTPReproduction(t *testing.T) {
 		ID: uuid.New(), Target: srv.URL,
 		Title: "SQLi", Severity: pipeline.SeverityHigh,
 		Reproduce: &pipeline.Reproduction{
-			HTTPRequest:       "GET / HTTP/1.1\nHost: " + stripScheme(srv.URL) + "\n\n",
+			// Absolute URL on the request line so the parser keeps the
+			// http:// scheme httptest actually serves.
+			HTTPRequest:       "GET " + srv.URL + "/ HTTP/1.1\nHost: " + stripScheme(srv.URL) + "\n\n",
 			ExpectedIndicator: "syntax error",
 		},
 	}
