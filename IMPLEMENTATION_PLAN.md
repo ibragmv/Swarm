@@ -307,16 +307,16 @@ Memory poisoning and inter-agent-comm attacks are real. Be the first tool to mar
 
 Zero-to-first-scan under 60 seconds.
 
-- [ ] **4.1.1** `pentestswarm init` — interactive, one-shot setup
-  - Prompt for Claude API key; store in the OS keychain (macOS Keychain / linux-secret-service / Windows Credential Manager) rather than a plaintext YAML
-  - Probe for `nmap`, `sqlmap`, `nuclei`, etc.; print a one-screen report of what's available vs. what to install
-  - Write a minimal `~/.pentestswarm/config.yaml` with sensible defaults
-- [ ] **4.1.2** First-run bootstrap: if `scan` is invoked without config, prompt once ("No API key found — paste it here or Ctrl-C to configure later") instead of failing with a stack trace
-- [ ] **4.1.3** One-line installer: `curl -sSL https://install.pentestswarm.ai | sh` — fetches the matching release binary, verifies the checksum, puts it on PATH, runs `init`
-- [ ] **4.1.4** Homebrew tap repo at `Armur-Ai/homebrew-tap` — GoReleaser renders the formula from `deploy/homebrew/pentestswarm.rb.template` on every tagged release
-- [ ] **4.1.5** "Zero to First Finding in 60 seconds" landing page — one-minute screencast + three copyable commands; linked at the top of the README
-- [ ] **4.1.6** Bundled Docker image `armurai/pentest-swarm:research` with nmap + sqlmap + the ProjectDiscovery stack pre-installed, so no external deps needed
-- [ ] **4.1.7** `pentestswarm doctor --fix` auto-installs missing tools it can install safely (ProjectDiscovery Go binaries via `go install`; nmap / sqlmap delegate to brew/apt)
+- [x] **4.1.1** `pentestswarm init` — interactive, one-shot setup
+  - [x] API key stored via `internal/keychain` (go-keyring — macOS Keychain / linux-secret-service / Windows Credential Manager)
+  - [x] Tool probe via shared `internal/toolprobe` — same data powers `doctor`
+  - [x] Writes `~/.pentestswarm/config.yaml` WITHOUT the API key (keychain owns the secret; config file is safe to commit)
+- [x] **4.1.2** First-run bootstrap — `scan` prompts once instead of failing when TTY is attached; offers to stash the key in the keychain
+- [ ] **4.1.3** One-line installer: `curl -sSL https://install.pentestswarm.ai | sh` *(external: needs `install.pentestswarm.ai` hosted)*
+- [ ] **4.1.4** Homebrew tap repo at `Armur-Ai/homebrew-tap` — formula template already in repo (`deploy/homebrew/pentestswarm.rb.template`); creating the tap repo is external
+- [ ] **4.1.5** "Zero to First Finding in 60 seconds" landing page *(external: needs site)*
+- [ ] **4.1.6** Bundled Docker image — base `Dockerfile` already present; pre-bundling nmap/sqlmap + publishing to GHCR is infra-side
+- [x] **4.1.7** `pentestswarm doctor --fix` auto-installs Go-installable tools; prints copy-paste commands for brew/apt tools (safer than running package managers for the user)
 
 ### Phase 4.2 — HackerOne + Bugcrowd Scope Auto-Import
 
