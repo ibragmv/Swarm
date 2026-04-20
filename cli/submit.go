@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -8,7 +9,10 @@ import (
 	"strings"
 
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/agent/report"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/agent/report/dedup"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/keychain"
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/pipeline"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/scope/importer/hackerone"
 	"github.com/spf13/cobra"
 )
 
@@ -69,18 +73,45 @@ func runSubmit(cmd *cobra.Command, args []string) error {
 	if program != "" {
 		fmt.Printf("  %s program slug: %s\n", colorCyan("[submit]"), program)
 	}
+
+	// Phase 4.4.5: pull the researcher's prior submissions so we can flag
+	// duplicate candidates before the draft is pasted into the platform.
+	// Best-effort — missing credentials = silent skip, not a failure.
+	priors := loadPriors(context.Background(), platform, program)
+	if len(priors) > 0 {
+		fmt.Printf("  %s loaded %d prior submissions for dedup\n", colorDim("[dedup]"), len(priors))
+	}
 	fmt.Println()
 
 	written := 0
 	for _, rf := range pr.Findings {
-		// In the future we'll cross-reference classifier output; for now
-		// the report finding is enough to render a decent submission.
 		v := report.BuildSubmissionView(rf, nil, nil)
 		body, err := report.RenderSubmission(platform, v)
 		if err != nil {
 			fmt.Printf("  %s %s — %s\n", colorRed("[skip]"), rf.Title, err)
 			continue
 		}
+
+		// Duplicate annotation: prepend a visible callout when a prior
+		// submission looks similar.
+		dupeTarget := ""
+		if len(rf.AffectedComponents) > 0 {
+			dupeTarget = rf.AffectedComponents[0]
+		}
+		hits := dedup.FindDuplicates(rf.Title, dupeTarget, priors, 0.6, 2)
+		if len(hits) > 0 {
+			var sb strings.Builder
+			sb.WriteString("> ⚠ Possible duplicate of:\n")
+			for _, h := range hits {
+				sb.WriteString(fmt.Sprintf("> - #%s (%s) — %.0f%% title similarity\n",
+					h.Prior.ID, h.Prior.State, h.Similarity*100))
+			}
+			body = append([]byte(sb.String()+"\n"), body...)
+			fmt.Printf("  %s %-40s ↔ #%s (%.0f%% match)\n",
+				colorYellow("[dupe?]"), truncateCLI(rf.Title, 40),
+				hits[0].Prior.ID, hits[0].Similarity*100)
+		}
+
 		fname := filepath.Join(outDir, sanitiseFilename(rf.Title)+".md")
 		if err := os.WriteFile(fname, body, 0o644); err != nil {
 			return fmt.Errorf("write %s: %w", fname, err)
@@ -92,6 +123,40 @@ func runSubmit(cmd *cobra.Command, args []string) error {
 	fmt.Printf("  Wrote %d submission drafts to %s\n", written, colorCyan(outDir))
 	fmt.Println(colorDim("  Review each draft, then paste into the platform's submission form."))
 	fmt.Println(colorDim("  (--live will post via the platform API in a future release.)"))
+	return nil
+}
+
+// loadPriors pulls the researcher's past submissions from the platform,
+// if credentials are available. Missing credentials = empty list, not
+// an error — dedup is an enhancement and shouldn't block submit.
+func loadPriors(ctx context.Context, platform, program string) []dedup.Prior {
+	switch strings.ToLower(platform) {
+	case "h1", "hackerone":
+		user := os.Getenv("HACKERONE_API_USER")
+		token := os.Getenv("HACKERONE_API_TOKEN")
+		if token == "" {
+			if v, err := keychain.Get(keychain.KeyHackerOneToken); err == nil {
+				token = v
+			}
+		}
+		if user == "" || token == "" {
+			return nil
+		}
+		c := hackerone.NewClient(hackerone.Config{APIUser: user, APIToken: token})
+		reports, err := c.Reports(ctx, 50)
+		if err != nil {
+			return nil
+		}
+		out := make([]dedup.Prior, 0, len(reports))
+		for _, r := range reports {
+			if program != "" && !strings.EqualFold(r.Program, program) {
+				continue
+			}
+			out = append(out, dedup.Prior{ID: r.ID, Title: r.Title, State: r.State})
+		}
+		return out
+	}
+	// Bugcrowd / Intigriti 'my prior reports' endpoints are TBD.
 	return nil
 }
 
