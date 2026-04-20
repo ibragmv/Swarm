@@ -15,9 +15,14 @@ import (
 var doctorCmd = &cobra.Command{
 	Use:   "doctor",
 	Short: "Check system health and dependencies",
-	Long:  "Runs a 10-point health check to verify all dependencies are available.",
-	Example: "  pentestswarm doctor",
+	Long: `Runs a health check and (optionally) auto-installs missing tools
+that have a safe 'go install' recipe. Tools that need brew / apt /
+package manager installs are printed with the shell command so you
+can copy-paste.`,
+	Example: `  pentestswarm doctor            # report only
+  pentestswarm doctor --fix      # run 'go install' for any missing Go tools`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		fix, _ := cmd.Flags().GetBool("fix")
 		fmt.Println("🔍 pentestswarm doctor — checking system health")
 		fmt.Println()
 
@@ -67,8 +72,52 @@ var doctorCmd = &cobra.Command{
 			}
 		}
 		fmt.Printf("\n%d/%d tools present\n", presentTools, totalTools)
+
+		if fix {
+			runAutoFix(toolprobe.Missing(results))
+		}
 		return nil
 	},
+}
+
+// runAutoFix walks missing tools and, for each one whose install hint
+// looks like a safe `go install …` command, runs it. Everything else
+// is printed as a shell command the operator can copy-paste — we never
+// call brew/apt on the user's behalf because those modify system state
+// outside our lane.
+func runAutoFix(missing []toolprobe.Tool) {
+	fmt.Println()
+	fmt.Println(colorBold("Auto-fix"))
+
+	var autoInstall, manual []toolprobe.Tool
+	for _, t := range missing {
+		if looksGoInstallable(t.InstallHint) {
+			autoInstall = append(autoInstall, t)
+		} else {
+			manual = append(manual, t)
+		}
+	}
+
+	for _, t := range autoInstall {
+		fmt.Printf("  %s %s   %s\n", colorYellow("[running]"), colorCyan(t.Name), colorDim(t.InstallHint))
+		parts := strings.Fields(t.InstallHint)
+		cmd := exec.Command(parts[0], parts[1:]...)
+		cmd.Stdout = nil
+		cmd.Stderr = nil
+		if err := cmd.Run(); err != nil {
+			fmt.Printf("  %s %s   %s\n", colorRed("[failed]"), colorCyan(t.Name), colorDim(err.Error()))
+			continue
+		}
+		fmt.Printf("  %s %s\n", colorGreen("[installed]"), colorCyan(t.Name))
+	}
+
+	if len(manual) > 0 {
+		fmt.Println()
+		fmt.Println(colorDim("  Run these yourself (auto-fix doesn't touch your package manager):"))
+		for _, t := range manual {
+			fmt.Printf("    %s %s\n", colorDim("$"), t.InstallHint)
+		}
+	}
 }
 
 // looksGoInstallable returns true when the install hint is a `go install …`
@@ -144,5 +193,6 @@ func checkRAM() (string, bool) {
 }
 
 func init() {
+	doctorCmd.Flags().Bool("fix", false, "run 'go install' for any Go-installable missing tools (brew/apt tools are printed, not executed)")
 	rootCmd.AddCommand(doctorCmd)
 }
