@@ -334,12 +334,13 @@ No one should have to hand-type a 200-asset scope list.
 
 XBOW's reputation rides on low false-positive rate. So does ours.
 
-- [ ] **4.3.1** Every finding must carry a `reproduce` field — either a shell command, an HTTP request, or a Burp-repeater-ready file
-- [ ] **4.3.2** `ConfirmationAgent` swarm agent: after the exploit agent publishes a finding, this agent re-runs the reproduction from a freshly-rotated IP (outbound proxy) to prove the vuln isn't an artefact of state. On failure to reproduce, pheromone drops to 0.1 and the finding is filtered from the final report.
-- [ ] **4.3.3** "Cross-validation" — the same suspected vuln is fired against by two different tools (e.g. nuclei + sqlmap for SQLi); we only publish findings that at least two tools agree on, OR one tool plus a successful PoC
-- [ ] **4.3.4** False-positive feedback loop: in the generated report, each finding has a one-click "mark as FP" link. When clicked, the pattern is persisted to `~/.pentestswarm/fp-cache.jsonl` and future scans of the same pattern are suppressed
-- [ ] **4.3.5** CVSS sanity-check: classifier's CVSS is cross-referenced against NVD + CIRCL CVE-search. Mismatch > 2.0 points downgrades confidence to `unverified`
-- [ ] **4.3.6** Two report modes: `--mode bugbounty` (default — only publishes reproduced findings) and `--mode aggressive` (includes suspected-but-unverified, with a banner saying so)
+- [x] **4.3.1** `pipeline.Reproduction` struct on ClassifiedFinding: Command / HTTPRequest / ExpectedIndicator / Tools
+- [x] **4.3.2** `ConfirmationAgent` — re-runs Reproduction (shell command or HTTP request), supersedes with pheromone 0.1 when indicator is absent
+  - [ ] Rotated IP (outbound proxy) per-run *(follow-up: needs a proxy-pool integration)*
+- [x] **4.3.3** `pipeline.CrossValidate` — 2+ tools on same target+category promote to High confidence; 0/1 tool without reproduction downgrades to Unverified
+- [x] **4.3.4** FP feedback loop at `~/.pentestswarm/fp-cache.jsonl` — append-only JSONL, wildcards by target/category, auto-suppresses matching findings on future scans
+- [x] **4.3.5** NVD CVSS sanity-check: `internal/pipeline/nvdcheck` fetches v3.1 base score, disk-cached, flags mismatches > 2.0 CVSS points
+- [x] **4.3.6** `--publish-unverified` flag — default (0.5 threshold) only publishes confirmed findings; with the flag, threshold drops to 0.1 and suspected findings ship too
 
 ### Phase 4.4 — Report & Submission Automation
 
