@@ -322,13 +322,13 @@ Zero-to-first-scan under 60 seconds.
 
 No one should have to hand-type a 200-asset scope list.
 
-- [ ] **4.2.1** `pentestswarm scope import h1 <program-slug>` — pulls in-scope assets from HackerOne's API (if the researcher has a token) or via public program JSON; writes `scope.yaml` ready to consume
-- [ ] **4.2.2** `pentestswarm scope import bugcrowd <program-slug>` — Bugcrowd equivalent
-- [ ] **4.2.3** `pentestswarm scope import intigriti <program-slug>`
-- [ ] **4.2.4** `pentestswarm scope import synack <program-slug>` (if API available)
-- [ ] **4.2.5** Credential-per-program config — per-program API tokens stored in the keychain; `scan --program h1:my-program` auto-picks the right token + scope + report template
-- [ ] **4.2.6** Scope diff command: `pentestswarm scope diff <prev.yaml> <current.yaml>` → used by ASM mode to flag newly-added assets that became in-scope overnight
-- [ ] **4.2.7** Scope drift guard: if a program **removes** an asset mid-campaign, abort in-flight scans against that asset within 5s and mark as out-of-scope
+- [x] **4.2.1** `pentestswarm scope import h1 <slug>` — pulls structured_scopes from HackerOne's v1 API; URL/WILDCARD/DOMAIN → domains, CIDR/IP → CIDRs; Basic auth for private programs
+- [x] **4.2.2** `pentestswarm scope import bugcrowd <slug>` — v4 engagements/targets endpoint with Token auth
+- [x] **4.2.3** `pentestswarm scope import intigriti <slug>` — external researcher API with Bearer auth
+- [ ] **4.2.4** `pentestswarm scope import synack <slug>` *(deferred: Synack's API is gated; revisit when a researcher with access can test)*
+- [ ] **4.2.5** Credential-per-program config *(partial: tokens stored in keychain via init; per-program override not yet wired)*
+- [x] **4.2.6** `pentestswarm scope diff <prev.yaml> <current.yaml>` — coloured +/- diff or JSON, non-zero exit when changes found (shell-friendly)
+- [x] **4.2.7** Scope drift guard — `scope.Watcher` reloads the YAML on a ticker, emits `Diff`s via a channel for the scheduler to warn on / abort in-flight scans
 
 ### Phase 4.3 — Verified-PoC Gate (The Signal-vs-Noise Moat)
 
