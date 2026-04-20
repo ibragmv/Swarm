@@ -85,22 +85,51 @@ type RawFinding struct {
 
 // ClassifiedFinding is a finding enriched with CVE, CVSS, and severity data.
 type ClassifiedFinding struct {
-	ID                     uuid.UUID  `json:"id"`
-	RawFindingID           uuid.UUID  `json:"raw_finding_id"`
-	CampaignID             uuid.UUID  `json:"campaign_id"`
-	Title                  string     `json:"title"`
-	Description            string     `json:"description"`
-	CVEIDs                 []string   `json:"cve_ids,omitempty"`
-	CVSSScore              float64    `json:"cvss_score"`
-	CVSSVector             string     `json:"cvss_vector,omitempty"`
-	Severity               Severity   `json:"severity"`
-	AttackCategory         string     `json:"attack_category"`
-	Confidence             Confidence `json:"confidence"`
-	FalsePositiveProbability float64  `json:"false_positive_probability"`
-	ChainCandidates        []uuid.UUID `json:"chain_candidates,omitempty"`
-	Evidence               []Evidence  `json:"evidence"`
-	Target                 string     `json:"target"`
-	ClassifiedAt           time.Time  `json:"classified_at"`
+	ID                       uuid.UUID   `json:"id"`
+	RawFindingID             uuid.UUID   `json:"raw_finding_id"`
+	CampaignID               uuid.UUID   `json:"campaign_id"`
+	Title                    string      `json:"title"`
+	Description              string      `json:"description"`
+	CVEIDs                   []string    `json:"cve_ids,omitempty"`
+	CVSSScore                float64     `json:"cvss_score"`
+	CVSSVector               string      `json:"cvss_vector,omitempty"`
+	Severity                 Severity    `json:"severity"`
+	AttackCategory           string      `json:"attack_category"`
+	Confidence               Confidence  `json:"confidence"`
+	FalsePositiveProbability float64     `json:"false_positive_probability"`
+	ChainCandidates          []uuid.UUID `json:"chain_candidates,omitempty"`
+	Evidence                 []Evidence  `json:"evidence"`
+	Target                   string      `json:"target"`
+	ClassifiedAt             time.Time   `json:"classified_at"`
+
+	// Reproduce is a copy-pasteable way for a human (or the ConfirmationAgent)
+	// to re-run the vuln check. Populated by the exploit agent / tool
+	// adapters — not by the classifier. When present, the H1/Bugcrowd
+	// report templates drop this into the "Steps to Reproduce" block.
+	Reproduce *Reproduction `json:"reproduce,omitempty"`
+}
+
+// Reproduction describes exactly how to re-trigger a finding. One of
+// Command or HTTPRequest should be set; both may be set for maximum
+// researcher convenience (CLI for quick copy, HTTP for Burp import).
+type Reproduction struct {
+	// Command is a shell command-line. Must be safe to paste verbatim
+	// (sh-quoted; no placeholder substitution).
+	Command string `json:"command,omitempty"`
+
+	// HTTPRequest is a raw HTTP/1.1 request ready to paste into Burp
+	// Repeater, `curl --raw`, or similar.
+	HTTPRequest string `json:"http_request,omitempty"`
+
+	// ExpectedIndicator is a substring that the operator should see in
+	// the tool output / HTTP response when the vuln re-triggers. The
+	// ConfirmationAgent greps for this to decide pass/fail.
+	ExpectedIndicator string `json:"expected_indicator,omitempty"`
+
+	// Tool names the adapter used to produce this finding. Cross-validation
+	// (Phase 4.3.3) requires two different tools agreeing on a finding
+	// before it's published with full confidence.
+	Tools []string `json:"tools,omitempty"`
 }
 
 // Evidence represents proof of a finding.
