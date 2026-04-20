@@ -45,6 +45,7 @@ func runScan(cmd *cobra.Command, args []string) error {
 	output, _ := cmd.Flags().GetString("output")
 	providerOverride, _ := cmd.Flags().GetString("provider")
 	explorationBias, _ := cmd.Flags().GetString("exploration-bias")
+	publishUnverified, _ := cmd.Flags().GetBool("publish-unverified")
 
 	// Load config
 	cfg, err := config.Load(cfgFile)
@@ -112,16 +113,24 @@ func runScan(cmd *cobra.Command, args []string) error {
 		cancel()
 	}()
 
-	// Build campaign config
+	// Build campaign config. publishThreshold is the verified-PoC gate:
+	// default 0.5 ('bugbounty' — only confirmed findings ship), 0.1 when
+	// --publish-unverified is set ('aggressive' — suspected-but-not-
+	// reproduced findings included with a warning).
+	publishThreshold := 0.5
+	if publishUnverified {
+		publishThreshold = 0.1
+	}
 	cc := engine.CampaignConfig{
-		Target:          target,
-		Scope:           strings.Split(scopeStr, ","),
-		Objective:       objective,
-		Mode:            mode,
-		DryRun:          dryRun,
-		OutputDir:       output,
-		Format:          format,
-		Provider:        providerOverride,
+		Target:           target,
+		Scope:            strings.Split(scopeStr, ","),
+		Objective:        objective,
+		Mode:             mode,
+		DryRun:           dryRun,
+		OutputDir:        output,
+		Format:           format,
+		Provider:         providerOverride,
+		PublishThreshold: publishThreshold,
 		ExplorationBias: explorationBias,
 	}
 
@@ -255,6 +264,7 @@ func init() {
 	scanCmd.Flags().Bool("strict", false, "abort on any LLM error instead of degrading to heuristics")
 	scanCmd.Flags().Bool("swarm", false, "use the stigmergic swarm scheduler (experimental); default is the sequential 5-phase runner")
 	scanCmd.Flags().String("exploration-bias", "med", "swarm pheromone scaling: low|med|high (breadth-first = high, depth-first = low)")
+	scanCmd.Flags().Bool("publish-unverified", false, "include suspected-but-not-reproduced findings in the report (aggressive mode)")
 	scanCmd.Flags().String("auth-token", "", "authorization token")
 
 	_ = scanCmd.MarkFlagRequired("scope")

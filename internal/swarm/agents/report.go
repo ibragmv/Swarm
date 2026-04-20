@@ -18,31 +18,41 @@ import (
 // Campaign / Findings / Plan / Results shape, and hands it to the
 // existing report agent for rendering.
 type ReportAgent struct {
-	reportAgent *reportpkg.ReportAgent
-	renderer    *reportpkg.Renderer
-	campaign    pipeline.Campaign
-	outputDir   string
-	format      string
-	onRendered  func(paths map[string]string)
+	reportAgent      *reportpkg.ReportAgent
+	renderer         *reportpkg.Renderer
+	campaign         pipeline.Campaign
+	outputDir        string
+	format           string
+	publishThreshold float64 // findings below this pheromone are excluded from the report
+	onRendered       func(paths map[string]string)
 }
 
 // NewReportAgent wires the existing report agent into the swarm.
-// onRendered, if non-nil, is called after render with a map of
-// {"md": path, "html": path, "json": path}.
-func NewReportAgent(inner *reportpkg.ReportAgent, renderer *reportpkg.Renderer, campaign pipeline.Campaign, outputDir, format string, onRendered func(map[string]string)) *ReportAgent {
+// publishThreshold gates which findings appear in the report:
+//
+//	0.5 (default) — 'bugbounty' mode: verified PoCs only.
+//	                ConfirmationAgent's superseded findings (pheromone
+//	                0.1) are automatically excluded.
+//	0.1 ('aggressive') — include everything including suspected-but-
+//	                not-reproduced findings (with a banner in the report).
+func NewReportAgent(inner *reportpkg.ReportAgent, renderer *reportpkg.Renderer, campaign pipeline.Campaign, outputDir, format string, publishThreshold float64, onRendered func(map[string]string)) *ReportAgent {
 	if outputDir == "" {
 		outputDir = "./reports"
 	}
 	if format == "" {
 		format = "md"
 	}
+	if publishThreshold <= 0 {
+		publishThreshold = 0.5
+	}
 	return &ReportAgent{
-		reportAgent: inner,
-		renderer:    renderer,
-		campaign:    campaign,
-		outputDir:   outputDir,
-		format:      format,
-		onRendered:  onRendered,
+		reportAgent:      inner,
+		renderer:         renderer,
+		campaign:         campaign,
+		outputDir:        outputDir,
+		format:           format,
+		publishThreshold: publishThreshold,
+		onRendered:       onRendered,
 	}
 }
 
@@ -59,10 +69,12 @@ func (a *ReportAgent) MaxConcurrency() int { return 1 }
 
 // Handle queries the board, generates, renders, and writes the report.
 func (a *ReportAgent) Handle(ctx context.Context, f blackboard.Finding, board blackboard.Board) error {
-	// Reconstruct findings
+	// Reconstruct findings. publishThreshold excludes low-pheromone findings
+	// (those superseded by the ConfirmationAgent, or agent-error noise).
 	matches, _ := board.Query(ctx, blackboard.Predicate{
-		Types: []blackboard.FindingType{blackboard.TypeCVEMatch, blackboard.TypeMisconfig},
-		Limit: 500,
+		Types:        []blackboard.FindingType{blackboard.TypeCVEMatch, blackboard.TypeMisconfig},
+		MinPheromone: a.publishThreshold,
+		Limit:        500,
 	})
 	findings := make([]pipeline.ClassifiedFinding, 0, len(matches))
 	for _, m := range matches {

@@ -37,6 +37,12 @@ type CampaignConfig struct {
 	// ExplorationBias scales pheromone weights in the swarm path.
 	// "", "med" = default (1.0×); "low" = 0.7× (depth-first); "high" = 1.3× (breadth-first).
 	ExplorationBias string
+
+	// PublishThreshold is the minimum pheromone a finding must have to
+	// appear in the final report. Default (0.5) is "bugbounty mode" —
+	// only verified / not-superseded findings ship. 0.1 is "aggressive
+	// mode" which includes suspected-but-unverified findings.
+	PublishThreshold float64
 }
 
 // EventCallback is called for every campaign event (for TUI/streaming).

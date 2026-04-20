@@ -136,7 +136,7 @@ func (r *Runner) RunSwarm(ctx context.Context, cc CampaignConfig, onEvent EventC
 		}, campaignID, 1, tuningSettings),
 		agents.NewClassifierAgent(classifierInner, campaignID, 3),
 		agents.NewExploitAgent(exploitInner, executor, cc.Objective, campaignID, 2, cc.DryRun, tuningSettings),
-		agents.NewReportAgent(reportInner, renderer, campaign, cc.OutputDir, cc.Format,
+		agents.NewReportAgent(reportInner, renderer, campaign, cc.OutputDir, cc.Format, cc.PublishThreshold,
 			func(paths map[string]string) {
 				for k, p := range paths {
 					emit(pipeline.EventToolResult, "report", fmt.Sprintf("%s report: %s", k, p))
