@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/keychain"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/scope"
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/scope/importer"
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/scope/importer/bugcrowd"
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/scope/importer/hackerone"
@@ -13,6 +14,79 @@ import (
 	"github.com/spf13/cobra"
 	"go.yaml.in/yaml/v3"
 )
+
+var scopeDiffCmd = &cobra.Command{
+	Use:   "diff <prev.yaml> <current.yaml>",
+	Short: "Diff two scope files — what assets were added or removed",
+	Long: `Reports the set-difference between two scope.yaml files. Useful for
+cron-driven ASM runs: re-import the program's scope every day, diff
+against yesterday's file, scan only the new assets.
+
+Exit code 0 = identical, 1 = changes found. Fits shell pipelines.`,
+	Args: cobra.ExactArgs(2),
+	Example: `  pentestswarm scope diff yesterday.yaml today.yaml
+  pentestswarm scope diff yesterday.yaml today.yaml --json`,
+	RunE: runScopeDiff,
+}
+
+func runScopeDiff(cmd *cobra.Command, args []string) error {
+	prev, err := readScope(args[0])
+	if err != nil {
+		return err
+	}
+	cur, err := readScope(args[1])
+	if err != nil {
+		return err
+	}
+	d := scope.Compare(*prev, *cur)
+
+	if asJSON, _ := cmd.Flags().GetBool("json"); asJSON {
+		buf, _ := yaml.Marshal(d)
+		fmt.Print(string(buf))
+	} else {
+		renderDiff(d)
+	}
+	if d.HasChanges() {
+		// Non-zero exit signals "scope changed" to shell pipelines.
+		return fmt.Errorf("scope changed")
+	}
+	return nil
+}
+
+func readScope(path string) (*scope.ScopeDefinition, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", path, err)
+	}
+	var def scope.ScopeDefinition
+	if err := yaml.Unmarshal(data, &def); err != nil {
+		return nil, fmt.Errorf("parse %s: %w", path, err)
+	}
+	return &def, nil
+}
+
+func renderDiff(d scope.Diff) {
+	if !d.HasChanges() {
+		fmt.Println("  " + colorGreen("[ok]") + " scope unchanged")
+		return
+	}
+	for _, added := range d.AddedDomains {
+		fmt.Printf("  %s %s\n", colorGreen("+"), added)
+	}
+	for _, added := range d.AddedCIDRs {
+		fmt.Printf("  %s %s\n", colorGreen("+"), added)
+	}
+	for _, removed := range d.RemovedDomains {
+		fmt.Printf("  %s %s\n", colorRed("-"), removed)
+	}
+	for _, removed := range d.RemovedCIDRs {
+		fmt.Printf("  %s %s\n", colorRed("-"), removed)
+	}
+	fmt.Printf("\n  %d unchanged, %d added, %d removed\n",
+		d.Unchanged,
+		len(d.AddedDomains)+len(d.AddedCIDRs),
+		len(d.RemovedDomains)+len(d.RemovedCIDRs))
+}
 
 var scopeCmd = &cobra.Command{
 	Use:   "scope",
@@ -120,6 +194,8 @@ func firstHost(domains []string) string {
 
 func init() {
 	scopeImportCmd.Flags().String("out", "scope.yaml", "output scope file path")
+	scopeDiffCmd.Flags().Bool("json", false, "emit diff as JSON for pipelines")
 	scopeCmd.AddCommand(scopeImportCmd)
+	scopeCmd.AddCommand(scopeDiffCmd)
 	rootCmd.AddCommand(scopeCmd)
 }
