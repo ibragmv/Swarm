@@ -12,10 +12,10 @@ import (
 
 // ScopeDefinition defines what targets are allowed.
 type ScopeDefinition struct {
-	AllowedCIDRs   []string `json:"allowed_cidrs"`
-	AllowedDomains []string `json:"allowed_domains"`
-	AllowedPorts   []int    `json:"allowed_ports"` // empty means all ports allowed
-	ExcludedCIDRs  []string `json:"excluded_cidrs"`
+	AllowedCIDRs   []string `json:"allowed_cidrs"   yaml:"allowed_cidrs"`
+	AllowedDomains []string `json:"allowed_domains" yaml:"allowed_domains"`
+	AllowedPorts   []int    `json:"allowed_ports"   yaml:"allowed_ports,omitempty"` // empty means all ports allowed
+	ExcludedCIDRs  []string `json:"excluded_cidrs"  yaml:"excluded_cidrs,omitempty"`
 }
 
 // Validate checks whether a target (IP, domain, or URL) is within scope.
