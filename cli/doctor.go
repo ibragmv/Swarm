@@ -5,8 +5,10 @@ import (
 	"net"
 	"os/exec"
 	"runtime"
+	"strings"
 	"time"
 
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/toolprobe"
 	"github.com/spf13/cobra"
 )
 
@@ -44,9 +46,35 @@ var doctorCmd = &cobra.Command{
 			}
 		}
 
-		fmt.Printf("\n%d/%d checks passed\n", passed, len(checks))
+		fmt.Printf("\n%d/%d infra checks passed\n", passed, len(checks))
+
+		// Tool probe — which external binaries are available.
+		fmt.Println()
+		fmt.Println(colorBold("Security tools"))
+		results := toolprobe.Probe()
+		totalTools, presentTools := 0, 0
+		for _, r := range results {
+			fmt.Println()
+			fmt.Println("  " + colorDim(r.Group.Title))
+			for _, t := range r.Group.Tools {
+				totalTools++
+				if r.Present[t.Name] {
+					presentTools++
+					fmt.Printf("    %s %-14s %s\n", colorGreen("✓"), colorCyan(t.Name), colorDim(t.Purpose))
+				} else {
+					fmt.Printf("    %s %-14s %s\n", colorRed("✗"), colorDim(t.Name), colorDim(t.Purpose+"  →  "+t.InstallHint))
+				}
+			}
+		}
+		fmt.Printf("\n%d/%d tools present\n", presentTools, totalTools)
 		return nil
 	},
+}
+
+// looksGoInstallable returns true when the install hint is a `go install …`
+// command we can safely run on the user's behalf.
+func looksGoInstallable(hint string) bool {
+	return strings.HasPrefix(hint, "go install ")
 }
 
 func checkAPI() (string, bool) {
