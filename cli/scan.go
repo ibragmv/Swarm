@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/keychain"
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/pipeline"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 var scanCmd = &cobra.Command{
@@ -60,6 +62,17 @@ func runScan(cmd *cobra.Command, args []string) error {
 			cfg.Orchestrator.APIKey = key
 		} else if key, err := keychain.Get(keychain.KeyClaudeAPI); err == nil && key != "" {
 			cfg.Orchestrator.APIKey = key
+		}
+	}
+
+	// First-run bootstrap: in an interactive terminal, prompt once instead
+	// of failing. A researcher who just installed the tool deserves a
+	// chance to paste their key without re-reading the docs.
+	if cfg.Orchestrator.APIKey == "" && cfg.Orchestrator.Provider == "claude" {
+		if !quiet && term.IsTerminal(int(os.Stdin.Fd())) {
+			if key := promptForAPIKeyOnce(); key != "" {
+				cfg.Orchestrator.APIKey = key
+			}
 		}
 	}
 
@@ -195,6 +208,39 @@ func providerOrDefault(override, def string) string {
 		return override
 	}
 	return def
+}
+
+// promptForAPIKeyOnce is the first-run escape hatch: if a researcher runs
+// 'pentestswarm scan …' before 'pentestswarm init', offer them one prompt
+// to paste a key and (optionally) stash it in the keychain so future runs
+// don't ask again. Ctrl-C or an empty line skips without writing anything.
+func promptForAPIKeyOnce() string {
+	fmt.Println()
+	fmt.Println(colorYellow("  No Claude API key found.") + " Paste one to continue, or Ctrl-C to cancel.")
+	fmt.Println(colorDim("  Tip: next time, run ") + colorCyan("pentestswarm init") + colorDim(" to set this up once and forget it."))
+	fmt.Print("  " + colorCyan("api key> "))
+	scanner := bufio.NewScanner(os.Stdin)
+	key := ""
+	if scanner.Scan() {
+		key = strings.TrimSpace(scanner.Text())
+	}
+	if key == "" {
+		return ""
+	}
+	// Offer to persist — the researcher can opt out if this is a one-off.
+	fmt.Print("  Save to OS keychain so we don't ask again? [Y/n] ")
+	answer := ""
+	if scanner.Scan() {
+		answer = strings.ToLower(strings.TrimSpace(scanner.Text()))
+	}
+	if answer == "" || answer == "y" || answer == "yes" {
+		if err := keychain.Set(keychain.KeyClaudeAPI, key); err != nil {
+			fmt.Printf("  %s couldn't save to keychain (%s) — using this run only.\n", colorYellow("[warn]"), err)
+		} else {
+			fmt.Printf("  %s stored in keychain\n", colorGreen("[ok]"))
+		}
+	}
+	return key
 }
 
 func init() {
