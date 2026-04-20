@@ -97,6 +97,79 @@ func (c *Client) Import(ctx context.Context, slug string) (*scope.ScopeDefinitio
 	return Map(envelope.Data), nil
 }
 
+// Reports fetches the authenticated researcher's own reports (up to
+// `limit`, most recent first). Used by the dedup check in Phase 4.4.5
+// — before filing a new report, we compare titles against what this
+// researcher has already submitted to the same program.
+//
+// Requires API credentials; public programs aren't enough.
+func (c *Client) Reports(ctx context.Context, limit int) ([]Report, error) {
+	if c.apiUser == "" || c.apiToken == "" {
+		return nil, fmt.Errorf("hackerone Reports: API credentials required")
+	}
+	if limit <= 0 || limit > 100 {
+		limit = 25
+	}
+	url := fmt.Sprintf("%s/hackers/me/reports?page[size]=%d", c.baseURL, limit)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/json")
+	auth := base64.StdEncoding.EncodeToString([]byte(c.apiUser + ":" + c.apiToken))
+	req.Header.Set("Authorization", "Basic "+auth)
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("hackerone transport: %w", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("hackerone %d: %s", resp.StatusCode, string(body))
+	}
+	var envelope struct {
+		Data []struct {
+			ID         string `json:"id"`
+			Attributes struct {
+				Title     string `json:"title"`
+				State     string `json:"state"`
+				CreatedAt string `json:"created_at"`
+			} `json:"attributes"`
+			Relationships struct {
+				Program struct {
+					Data struct {
+						Attributes struct {
+							Handle string `json:"handle"`
+						} `json:"attributes"`
+					} `json:"data"`
+				} `json:"program"`
+			} `json:"relationships"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return nil, fmt.Errorf("parse reports: %w", err)
+	}
+	out := make([]Report, 0, len(envelope.Data))
+	for _, r := range envelope.Data {
+		out = append(out, Report{
+			ID:      r.ID,
+			Title:   r.Attributes.Title,
+			State:   r.Attributes.State,
+			Program: r.Relationships.Program.Data.Attributes.Handle,
+		})
+	}
+	return out, nil
+}
+
+// Report is a summary of one H1 submission — enough for title-based dedup.
+type Report struct {
+	ID      string
+	Title   string
+	State   string // new | triaged | resolved | duplicate | …
+	Program string
+}
+
 // Map converts the HackerOne response shape into our scope definition.
 // Exposed for tests + for advanced callers that want to handle the raw
 // API response themselves.
