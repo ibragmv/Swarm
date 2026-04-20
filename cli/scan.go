@@ -10,6 +10,7 @@ import (
 
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/config"
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/engine"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/keychain"
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/pipeline"
 	"github.com/spf13/cobra"
 )
@@ -49,17 +50,24 @@ func runScan(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
-	// Check for API key in env if not in config
+	// Resolve the API key: env first (CI-friendly), then OS keychain
+	// (the path 'pentestswarm init' writes to), with config.yaml as the
+	// last-resort fallback so old setups keep working.
 	if cfg.Orchestrator.APIKey == "" {
 		if key := os.Getenv("PENTESTSWARM_ORCHESTRATOR_API_KEY"); key != "" {
 			cfg.Orchestrator.APIKey = key
 		} else if key := os.Getenv("ANTHROPIC_API_KEY"); key != "" {
 			cfg.Orchestrator.APIKey = key
+		} else if key, err := keychain.Get(keychain.KeyClaudeAPI); err == nil && key != "" {
+			cfg.Orchestrator.APIKey = key
 		}
 	}
 
 	if cfg.Orchestrator.APIKey == "" && cfg.Orchestrator.Provider == "claude" {
-		return fmt.Errorf("no API key found. Set PENTESTSWARM_ORCHESTRATOR_API_KEY or ANTHROPIC_API_KEY")
+		return fmt.Errorf("no API key configured.\n" +
+			"  Fix one of these, then re-run:\n" +
+			"    1) " + colorCyan("pentestswarm init") + "   (one-shot interactive setup)\n" +
+			"    2) " + colorCyan("export PENTESTSWARM_ORCHESTRATOR_API_KEY=sk-ant-...") + "   (or ANTHROPIC_API_KEY)")
 	}
 
 	// Print banner
