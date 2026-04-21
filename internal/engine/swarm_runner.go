@@ -78,12 +78,36 @@ func (r *Runner) RunSwarm(ctx context.Context, cc CampaignConfig, onEvent EventC
 	if cc.APIKey != "" {
 		orchestratorCfg.APIKey = cc.APIKey
 	}
-	provider, err := llm.NewProvider(orchestratorCfg)
+	rawProvider, err := llm.NewProvider(orchestratorCfg)
 	if err != nil {
 		return fmt.Errorf("failed to create LLM provider: %w", err)
 	}
+	// Wrap the provider with a cost meter so every Complete call feeds
+	// both the live-spend events and the final ROI footer.
+	meter := llm.NewMeter(orchestratorCfg.Model)
+	provider := meter.Wrap(rawProvider)
 
 	emit(pipeline.EventStateChange, "engine", "Swarm campaign initialized")
+
+	// Live cost meter: on a ticker, emit current $ spend so --follow
+	// surfaces it without each agent having to self-report.
+	meterCtx, meterCancel := context.WithCancel(ctx)
+	defer meterCancel()
+	go func() {
+		t := time.NewTicker(15 * time.Second)
+		defer t.Stop()
+		for {
+			select {
+			case <-meterCtx.Done():
+				return
+			case <-t.C:
+			}
+			u, spent := meter.Snapshot()
+			emit(pipeline.EventMilestone, "cost",
+				fmt.Sprintf("spent $%.3f so far (%d in / %d cached / %d out)",
+					spent, u.InputTokens, u.CacheReadInputTokens, u.OutputTokens))
+		}
+	}()
 
 	// Always run cleanup on exit, including SIGINT/budget cancellation.
 	defer func() {
@@ -199,6 +223,15 @@ func (r *Runner) RunSwarm(ctx context.Context, cc CampaignConfig, onEvent EventC
 	}
 
 	elapsed := time.Since(start).Round(time.Second)
+
+	// Final cost summary. Phase 4.5.7 ROI footer will join this once a
+	// bounty-value estimator ships — for now, the spend line alone is
+	// already useful to the researcher reviewing the report.
+	u, spent := meter.Snapshot()
+	emit(pipeline.EventMilestone, "cost",
+		fmt.Sprintf("total spent $%.3f  (input %d, cached %d, output %d)",
+			spent, u.InputTokens, u.CacheReadInputTokens, u.OutputTokens))
+
 	emit(pipeline.EventMilestone, "orchestrator",
 		fmt.Sprintf("Swarm campaign complete in %s — see ./reports", elapsed))
 	return nil
