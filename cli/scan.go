@@ -12,6 +12,7 @@ import (
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/config"
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/engine"
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/keychain"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/llm"
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/pipeline"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -46,12 +47,37 @@ func runScan(cmd *cobra.Command, args []string) error {
 	providerOverride, _ := cmd.Flags().GetString("provider")
 	explorationBias, _ := cmd.Flags().GetString("exploration-bias")
 	publishUnverified, _ := cmd.Flags().GetBool("publish-unverified")
+	estimate, _ := cmd.Flags().GetBool("estimate")
+	safeMode, _ := cmd.Flags().GetBool("safe-mode")
+	targetClass, _ := cmd.Flags().GetString("target-class")
+
+	// --estimate short-circuits everything: print expected cost and exit
+	// without touching the network. Fires before config validation so it
+	// works even without an API key.
+	if estimate {
+		modelName := "claude-sonnet-4-6"
+		if cfg, err := config.Load(cfgFile); err == nil && cfg.Orchestrator.Model != "" {
+			modelName = cfg.Orchestrator.Model
+		}
+		lo, hi := llm.PricingFor(modelName).EstimateUSD(targetClass)
+		fmt.Println()
+		fmt.Printf("  %s target class: %s\n", colorCyan("[estimate]"), fallback(targetClass, "medium"))
+		fmt.Printf("  %s model:        %s\n", colorCyan("[estimate]"), modelName)
+		fmt.Printf("  %s expected LLM spend: %s\n", colorCyan("[estimate]"),
+			colorBold(fmt.Sprintf("$%.2f – $%.2f", lo, hi)))
+		fmt.Println(colorDim("  (No packets sent. Remove --estimate to run the scan.)"))
+		return nil
+	}
 
 	// Load config
 	cfg, err := config.Load(cfgFile)
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
+
+	// --safe-mode is advisory for now: the engine will consume this flag
+	// in a follow-up commit to cap RPS + block destructive techniques.
+	_ = safeMode
 
 	// Resolve the API key: env first (CI-friendly), then OS keychain
 	// (the path 'pentestswarm init' writes to), with config.yaml as the
@@ -219,6 +245,13 @@ func providerOrDefault(override, def string) string {
 	return def
 }
 
+func fallback(s, def string) string {
+	if s == "" {
+		return def
+	}
+	return s
+}
+
 // promptForAPIKeyOnce is the first-run escape hatch: if a researcher runs
 // 'pentestswarm scan …' before 'pentestswarm init', offer them one prompt
 // to paste a key and (optionally) stash it in the keychain so future runs
@@ -265,6 +298,9 @@ func init() {
 	scanCmd.Flags().Bool("swarm", false, "use the stigmergic swarm scheduler (experimental); default is the sequential 5-phase runner")
 	scanCmd.Flags().String("exploration-bias", "med", "swarm pheromone scaling: low|med|high (breadth-first = high, depth-first = low)")
 	scanCmd.Flags().Bool("publish-unverified", false, "include suspected-but-not-reproduced findings in the report (aggressive mode)")
+	scanCmd.Flags().Bool("estimate", false, "print expected LLM spend in USD and exit without scanning")
+	scanCmd.Flags().String("target-class", "medium", "estimate sizing: small | medium | large")
+	scanCmd.Flags().Bool("safe-mode", false, "cap RPS + forbid destructive techniques (for programs that disallow automated scanning)")
 	scanCmd.Flags().String("auth-token", "", "authorization token")
 
 	_ = scanCmd.MarkFlagRequired("scope")
