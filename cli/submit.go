@@ -10,7 +10,10 @@ import (
 
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/agent/report"
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/agent/report/dedup"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/agent/report/qualitygate"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/config"
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/keychain"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/llm"
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/pipeline"
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/scope/importer/hackerone"
 	"github.com/spf13/cobra"
@@ -81,6 +84,29 @@ func runSubmit(cmd *cobra.Command, args []string) error {
 	if len(priors) > 0 {
 		fmt.Printf("  %s loaded %d prior submissions for dedup\n", colorDim("[dedup]"), len(priors))
 	}
+
+	// Phase 4.4.7: optional quality-gate grader. Only fires when the
+	// researcher asked for it AND a tool-use-capable LLM is configured
+	// (falls back to 'disabled with warning' otherwise).
+	var gate llm.Provider
+	if qg, _ := cmd.Flags().GetBool("quality-gate"); qg {
+		if cfg, cerr := config.Load(cfgFile); cerr == nil {
+			if cfg.Orchestrator.APIKey == "" {
+				if k, err := keychain.Get(keychain.KeyClaudeAPI); err == nil {
+					cfg.Orchestrator.APIKey = k
+				}
+			}
+			if p, err := llm.NewProvider(cfg.Orchestrator); err == nil {
+				gate = p
+				fmt.Printf("  %s quality gate on (rubric: clarity / impact / reproducibility)\n",
+					colorDim("[qg]"))
+			}
+		}
+		if gate == nil {
+			fmt.Printf("  %s --quality-gate set but no LLM provider ready — skipping\n",
+				colorYellow("[warn]"))
+		}
+	}
 	fmt.Println()
 
 	written := 0
@@ -110,6 +136,28 @@ func runSubmit(cmd *cobra.Command, args []string) error {
 			fmt.Printf("  %s %-40s ↔ #%s (%.0f%% match)\n",
 				colorYellow("[dupe?]"), truncateCLI(rf.Title, 40),
 				hits[0].Prior.ID, hits[0].Similarity*100)
+		}
+
+		// Quality gate — runs per-finding so the rubric sees one draft at a time.
+		if gate != nil {
+			qr, err := qualitygate.Grade(context.Background(), gate, string(body))
+			if err == nil && qr != nil {
+				if !qr.Pass() {
+					var sb strings.Builder
+					sb.WriteString(fmt.Sprintf("> 🛑 **Quality gate blocked** — overall %.1f/10\n", qr.OverallScore))
+					if qr.BlockingIssue != "" {
+						sb.WriteString("> " + qr.BlockingIssue + "\n")
+					}
+					sb.WriteString("> Polish:\n")
+					for _, s := range qr.Suggestions {
+						sb.WriteString("> - " + s + "\n")
+					}
+					body = append([]byte(sb.String()+"\n"), body...)
+					fmt.Printf("  %s %-40s  %.1f/10\n", colorRed("[block]"), truncateCLI(rf.Title, 40), qr.OverallScore)
+				} else {
+					fmt.Printf("  %s %-40s  %.1f/10\n", colorGreen("[pass]"), truncateCLI(rf.Title, 40), qr.OverallScore)
+				}
+			}
 		}
 
 		fname := filepath.Join(outDir, sanitiseFilename(rf.Title)+".md")
@@ -194,5 +242,6 @@ func init() {
 	submitCmd.Flags().String("out", "./submissions", "directory to write submission drafts into")
 	submitCmd.Flags().String("program", "", "program slug (only used by --live, not dry-run)")
 	submitCmd.Flags().Bool("live", false, "actually POST submissions via the platform API (not yet implemented)")
+	submitCmd.Flags().Bool("quality-gate", false, "run each draft through an LLM rubric and block drafts scoring below 6/10")
 	rootCmd.AddCommand(submitCmd)
 }
