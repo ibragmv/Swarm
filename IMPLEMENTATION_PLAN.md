@@ -346,18 +346,15 @@ XBOW's reputation rides on low false-positive rate. So does ours.
 
 Turn a campaign into a ready-to-paste submission.
 
-- [ ] **4.4.1** HackerOne submission template — matches their exact structure: Summary · Steps to Reproduce · Impact · Recommendation · Severity (with CVSS vector). Template lives in `internal/agent/report/templates/hackerone.md.tmpl`
-- [ ] **4.4.2** Bugcrowd submission template (different schema: ASV, VRT category, description, proof)
-- [ ] **4.4.3** Intigriti submission template
-- [ ] **4.4.4** `pentestswarm submit --platform h1 --program <slug> --report <path> --dry-run` — renders the submission, previews it in the terminal. Real submission requires `--live` + y/n confirmation
-- [ ] **4.4.5** Auto-dedup against the researcher's own prior submissions via the H1 API — if they already filed something matching this pattern, the finding is labelled `(already filed as #123456)` in the report instead of re-submitted
-- [ ] **4.4.6** Platform-agnostic duplicate check: fuzzy-match finding title + target against the program's public disclosed reports; flag `possible_duplicate` in the UI before the researcher submits
-- [ ] **4.4.7** Report quality gate: every generated report passes through a second LLM call that grades clarity, impact framing, and reproducibility on a 0–10 rubric. Below 6 = blocked with a "polish these sections" prompt
-- [ ] **4.4.8** Evidence capture:
-  - `gowitness`-backed screenshot of every web finding embedded in the report
-  - HTTP request/response pairs saved as `.http` files (Burp-importable)
-  - For SQLi: redacted sqlmap output + the exact injection point
-- [ ] **4.4.9** `pentestswarm report polish <path>` — manual re-run of the quality gate on an existing report after a researcher's edits
+- [x] **4.4.1** HackerOne template at `internal/agent/report/templates/hackerone.md.tmpl` (Summary · Steps · Impact · Recommendation · Severity · CVEs · Verified-by)
+- [x] **4.4.2** Bugcrowd template — VRT / Vuln-Details / Steps / PoC / Remediation layout
+- [x] **4.4.3** Intigriti template — 'Type of weakness' field, PoC above Impact
+- [x] **4.4.4** `pentestswarm submit` writes per-finding drafts to `./submissions/`; `--live` is gated with a 'not yet implemented' error (can't accidentally post an AI-generated report)
+- [x] **4.4.5** H1 dedup — `Client.Reports()` + `dedup.FindDuplicates` (Jaccard, target-boost); drafts get a `> ⚠ Possible duplicate of: #…` callout prepended
+- [ ] **4.4.6** Dedup against program's PUBLIC disclosed reports *(partial: `dedup` package works on any `[]Prior`; needs a public-reports fetcher — H1 has one, Bugcrowd scraping TBD)*
+- [x] **4.4.7** Quality gate at `internal/agent/report/qualitygate`: LLM rubric on clarity / impact / reproducibility; threshold 6.0, structured tool-use so parse failures are impossible; `submit --quality-gate` wires it
+- [x] **4.4.8** Evidence capture at `internal/agent/report/evidence`: `.http` files (Burp-importable) + optional gowitness screenshots; missing gowitness = silent skip
+- [x] **4.4.9** `pentestswarm report polish <path>` — re-runs the rubric on a hand-edited draft; non-zero exit when below threshold (shell-friendly)
 
 ### Phase 4.5 — Cost + Risk Controls
 
