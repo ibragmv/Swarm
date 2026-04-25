@@ -170,6 +170,44 @@ type Report struct {
 	Program string
 }
 
+// Policy fetches the program's rules-of-engagement text. Used by
+// `pentestswarm program inspect h1:<slug>` to extract machine-readable
+// constraints (rate limits, banned techniques, required headers).
+//
+// Public programs work without auth; private ones need credentials.
+func (c *Client) Policy(ctx context.Context, slug string) (string, error) {
+	url := fmt.Sprintf("%s/hackers/programs/%s", c.baseURL, slug)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Accept", "application/json")
+	if c.apiUser != "" && c.apiToken != "" {
+		auth := base64.StdEncoding.EncodeToString([]byte(c.apiUser + ":" + c.apiToken))
+		req.Header.Set("Authorization", "Basic "+auth)
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("hackerone transport: %w", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 400 {
+		return "", fmt.Errorf("hackerone %d: %s", resp.StatusCode, string(body))
+	}
+	var envelope struct {
+		Data struct {
+			Attributes struct {
+				Policy string `json:"policy"`
+			} `json:"attributes"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return "", fmt.Errorf("parse policy: %w", err)
+	}
+	return envelope.Data.Attributes.Policy, nil
+}
+
 // Map converts the HackerOne response shape into our scope definition.
 // Exposed for tests + for advanced callers that want to handle the raw
 // API response themselves.
