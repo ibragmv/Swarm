@@ -85,11 +85,13 @@ func (s *Scheduler) Register(a Agent) {
 
 // Run drives the swarm until one of:
 //   - ctx is cancelled (graceful shutdown; returns ctx.Err())
-//   - budget is exceeded (returns a budget error)
 //   - a CAMPAIGN_COMPLETE finding is written to the blackboard (returns nil)
 //
 // Run never returns while agents are still handling findings — it waits for
 // in-flight Handle calls to complete or the shutdown grace period to expire.
+//
+// Budget exhaustion does NOT abort directly; it writes CAMPAIGN_COMPLETE so
+// the report agent fires on partial state. See the budget enforcer below.
 func (s *Scheduler) Run(ctx context.Context) error {
 	if len(s.agents) == 0 {
 		return fmt.Errorf("no agents registered")
@@ -122,12 +124,20 @@ func (s *Scheduler) Run(ctx context.Context) error {
 		}
 	}()
 
-	// Budget enforcer
+	// Budget enforcer. Pause-on-budget (4.5.3): instead of immediately
+	// cancelling the runCtx (which would orphan partial findings without
+	// a report), we write a CAMPAIGN_COMPLETE finding to the blackboard.
+	// That fires the report agent, which renders whatever the swarm
+	// surfaced before the cap. The campaign-completion watcher above
+	// then closes out cleanly. Net effect: the researcher gets a partial
+	// report instead of an empty output dir, and they can extend the
+	// budget + re-run if they want more.
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		t := time.NewTicker(s.budgetCheckInterval)
 		defer t.Stop()
+		paused := false
 		for {
 			select {
 			case <-runCtx.Done():
@@ -135,14 +145,23 @@ func (s *Scheduler) Run(ctx context.Context) error {
 			case <-t.C:
 			}
 			bud, err := s.board.Budget(runCtx, s.campaignID)
-			if err == nil && bud.Exceeded() {
+			if err == nil && bud.Exceeded() && !paused {
+				paused = true
 				s.emit(Event{
 					Type: "budget_exceeded", Timestamp: time.Now(), CampaignID: s.campaignID,
-					Detail: fmt.Sprintf("hours=%.2f/%.2f tokens=%d/%d",
+					Detail: fmt.Sprintf("paused — hours=%.2f/%.2f tokens=%d/%d (firing partial report)",
 						bud.AgentHoursUsed, bud.MaxAgentHours, bud.TokensUsed, bud.MaxTokens),
 				})
-				cancel()
-				return
+				_, _ = s.board.Write(runCtx, blackboard.Finding{
+					CampaignID:    s.campaignID,
+					AgentName:     "scheduler",
+					Type:          blackboard.TypeCampaignComplete,
+					Target:        "",
+					PheromoneBase: 1.0,
+					HalfLifeSec:   300,
+				})
+				// Don't cancel here — let the campaign-complete watcher
+				// drive shutdown so the report agent has time to run.
 			}
 		}
 	}()
