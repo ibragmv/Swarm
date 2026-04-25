@@ -74,6 +74,13 @@ func (r *Renderer) ToMarkdown(report *pipeline.PentestReport) ([]byte, error) {
 			item.Priority, item.Finding, item.Action, item.Effort, item.Impact))
 	}
 
+	// ROI footer (4.5.7) — only renders when the runner supplied spend data.
+	if report.ROIFooter != "" {
+		b.WriteString("\n---\n\n")
+		b.WriteString(report.ROIFooter)
+		b.WriteString("\n")
+	}
+
 	return []byte(b.String()), nil
 }
 

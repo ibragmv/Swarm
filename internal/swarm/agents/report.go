@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 
 	reportpkg "github.com/Armur-Ai/Pentest-Swarm-AI/internal/agent/report"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/agent/report/bounty"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/agent/report/roi"
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/pipeline"
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/swarm/blackboard"
 	"github.com/google/uuid"
@@ -25,6 +27,14 @@ type ReportAgent struct {
 	format           string
 	publishThreshold float64 // findings below this pheromone are excluded from the report
 	onRendered       func(paths map[string]string)
+	// spendSnapshot returns the current LLM dollar spend, or 0 if no
+	// metered provider is wired. Optional — when nil, the ROI footer
+	// is omitted from the report.
+	spendSnapshot func() float64
+	// programStats is the per-program bounty stats used to refine the
+	// ROI estimate. Optional — nil falls back to industry-average
+	// public-market numbers in `internal/agent/report/bounty`.
+	programStats *bounty.ProgramStats
 }
 
 // NewReportAgent wires the existing report agent into the swarm.
@@ -54,6 +64,16 @@ func NewReportAgent(inner *reportpkg.ReportAgent, renderer *reportpkg.Renderer, 
 		publishThreshold: publishThreshold,
 		onRendered:       onRendered,
 	}
+}
+
+// WithROI attaches a spend-snapshot closure and (optionally) per-program
+// bounty stats so the agent can render an ROI footer at the bottom of
+// the campaign report. Closure form means the snapshot stays fresh —
+// we read it at render time, not at agent construction time.
+func (a *ReportAgent) WithROI(spend func() float64, stats *bounty.ProgramStats) *ReportAgent {
+	a.spendSnapshot = spend
+	a.programStats = stats
+	return a
 }
 
 // Name implements swarm.Agent.
@@ -122,6 +142,13 @@ func (a *ReportAgent) Handle(ctx context.Context, f blackboard.Finding, board bl
 	rep, err := a.reportAgent.Generate(ctx, a.campaign, findings, plan, results)
 	if err != nil {
 		return fmt.Errorf("generate report: %w", err)
+	}
+
+	// Phase 4.5.7: ROI footer. Only renders when a metered provider was
+	// wired into the swarm — otherwise we'd be dividing by an unknown
+	// spend and the verdict would be meaningless.
+	if a.spendSnapshot != nil {
+		rep.ROIFooter = roi.Calculate(a.spendSnapshot(), findings, a.programStats).Footer()
 	}
 
 	if err := os.MkdirAll(a.outputDir, 0o755); err != nil {

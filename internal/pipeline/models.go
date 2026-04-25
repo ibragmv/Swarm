@@ -220,6 +220,13 @@ type PentestReport struct {
 	RiskSummary      RiskSummary       `json:"risk_summary"`
 	RemediationPlan  []RemediationItem `json:"remediation_plan"`
 	GeneratedAt      time.Time         `json:"generated_at"`
+
+	// ROIFooter is an optional one-line markdown block appended to the
+	// bottom of the report — populated by the runner from
+	// `internal/agent/report/roi.Result.Footer()`. Empty when ROI data
+	// isn't available (no metered provider, or campaign aborted before
+	// spend was tallied).
+	ROIFooter string `json:"roi_footer,omitempty"`
 }
 
 // ReportFinding is a finding formatted for the report.

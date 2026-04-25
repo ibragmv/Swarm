@@ -165,7 +165,7 @@ func (r *Runner) RunSwarm(ctx context.Context, cc CampaignConfig, onEvent EventC
 				for k, p := range paths {
 					emit(pipeline.EventToolResult, "report", fmt.Sprintf("%s report: %s", k, p))
 				}
-			}),
+			}).WithROI(func() float64 { _, s := meter.Snapshot(); return s }, nil),
 	}
 
 	sched := swarm.NewScheduler(board, campaignID,
@@ -224,9 +224,8 @@ func (r *Runner) RunSwarm(ctx context.Context, cc CampaignConfig, onEvent EventC
 
 	elapsed := time.Since(start).Round(time.Second)
 
-	// Final cost summary. Phase 4.5.7 ROI footer will join this once a
-	// bounty-value estimator ships — for now, the spend line alone is
-	// already useful to the researcher reviewing the report.
+	// Final cost summary. The ROI verdict (bounty value vs. spend) lands
+	// at the bottom of the rendered report itself — see report.WithROI.
 	u, spent := meter.Snapshot()
 	emit(pipeline.EventMilestone, "cost",
 		fmt.Sprintf("total spent $%.3f  (input %d, cached %d, output %d)",
