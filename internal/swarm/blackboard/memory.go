@@ -118,6 +118,17 @@ func (b *MemoryBoard) Write(ctx context.Context, f Finding, opts ...WriteOption)
 		opt(&o)
 	}
 
+	// Clamp pheromone to [0, 1]. Defends against MINJA-style memory
+	// injection where a malicious caller writes PheromoneBase=9999 to
+	// dominate trigger predicates that rank by pheromone. See
+	// internal/swarm/blackboard/injection_test.go.
+	if o.pheromoneBase > 1.0 {
+		o.pheromoneBase = 1.0
+	}
+	if o.pheromoneBase < 0 {
+		o.pheromoneBase = 0
+	}
+
 	if f.CampaignID == uuid.Nil || f.Type == "" || f.AgentName == "" {
 		return uuid.Nil, fmt.Errorf("finding requires campaign_id, type, and agent_name")
 	}
