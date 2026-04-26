@@ -9,6 +9,7 @@ import (
 
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/logger"
 	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/swarm/blackboard"
+	"github.com/Armur-Ai/Pentest-Swarm-AI/internal/swarm/ratelimit"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
@@ -30,6 +31,11 @@ type Scheduler struct {
 
 	// tracer is the distributed-tracing plug point. Defaults to NoopTracer.
 	tracer Tracer
+
+	// agentLimits caps how many findings each agent can dispatch per
+	// second. Missing entries → no limit (preserve historical behavior).
+	// See WithAgentRateLimit.
+	agentLimits map[string]*ratelimit.Limiter
 }
 
 // Event is a structured scheduler event emitted via the onEvent hook.
@@ -61,6 +67,22 @@ func WithTracer(t Tracer) SchedulerOption {
 		if t != nil {
 			s.tracer = t
 		}
+	}
+}
+
+// WithAgentRateLimit caps how many findings the named agent can dispatch
+// per second, with the given burst (== perSecond if burst<=0). Phase
+// 3.4.4 — defends against pathological feedback loops where an agent
+// wakes itself faster than its LLM provider can drain.
+//
+// Agents without a configured limit are uncapped (preserves prior
+// behavior; opt-in tightening, not blanket throttling).
+func WithAgentRateLimit(agentName string, perSecond, burst float64) SchedulerOption {
+	return func(s *Scheduler) {
+		if s.agentLimits == nil {
+			s.agentLimits = map[string]*ratelimit.Limiter{}
+		}
+		s.agentLimits[agentName] = ratelimit.New(perSecond, burst)
 	}
 }
 
@@ -245,6 +267,14 @@ func (s *Scheduler) runAgent(ctx context.Context, agent Agent) {
 				})
 				// Flip the warned flag with a no-op charge so we only warn once.
 				_ = s.board.ChargeAgent(ctx, s.campaignID, agent.Name(), 0)
+			}
+			// Per-agent rate limit (3.4.4). Take blocks if the bucket is
+			// empty; ctx.Err on cancel exits the dispatch loop cleanly.
+			if lim := s.agentLimits[agent.Name()]; lim != nil {
+				if err := lim.Take(ctx); err != nil {
+					inflight.Wait()
+					return
+				}
 			}
 			sem <- struct{}{}
 			inflight.Add(1)
