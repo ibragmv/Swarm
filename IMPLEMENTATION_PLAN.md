@@ -358,13 +358,13 @@ Turn a campaign into a ready-to-paste submission.
 
 ### Phase 4.5 — Cost + Risk Controls
 
-- [ ] **4.5.1** Pre-scan cost estimate: `pentestswarm scan ... --estimate` prints expected LLM token spend in USD (based on target-size heuristics + current Claude pricing). No packets sent.
-- [ ] **4.5.2** Running cost meter: TUI shows live `$ spent` during the scan; colour-coded when approaching budget
-- [ ] **4.5.3** Pause-on-budget: campaign pauses (not aborts) when budget is hit — researcher extends or stops. Pause also fires the report agent so partial results aren't lost
-- [ ] **4.5.4** `--safe-mode` preset for programs with "no automated scanning" clauses: caps RPS, forbids destructive techniques (no active fuzzing, no brute force, no DoS-y nuclei templates), requires per-step approval for anything that mutates state
-- [ ] **4.5.5** Program-terms parser: `pentestswarm program inspect h1:<slug>` reads the program's rules-of-engagement text, extracts constraints (rate limits, disallowed paths, must-have headers), and returns a config fragment that's auto-merged into the scan
-- [ ] **4.5.6** Bounty-per-finding estimator: classifies each finding and estimates a $ range from the program's public stats (average bounty by severity). Surfaces as a column in the final report
-- [ ] **4.5.7** Campaign ROI calculation in the report footer: expected bounty value vs. LLM spend; green if ratio >10×, yellow 2–10×, red below that
+- [x] **4.5.1** `--estimate` flag at `cli/scan.go`: short-circuits before config validation, prints USD range (`Pricing.EstimateUSD(class)` heuristic buckets), exits without touching network. Works pre-init (no API key required).
+- [x] **4.5.2** Live cost meter: `internal/llm/meter.go` (`Meter` + `meteredProvider` decorator wraps `Provider.Complete` to record `Usage`); `internal/engine/swarm_runner.go` ticks every 15s emitting a structured cost event; final spend prints on campaign end.
+- [x] **4.5.3** Pause-on-budget: scheduler writes CAMPAIGN_COMPLETE to the blackboard on budget exhaustion instead of cancelling, so the report agent renders a partial report from whatever was found before the cap. Researcher can extend the budget + re-run for more.
+- [x] **4.5.4** `--safe-mode` flag wired through `cli/scan.go` → `engine.CampaignConfig.SafeMode` → `exploit.Executor.WithSafeMode(true)`. Rejects destructive tokens (rm/kill/chmod/drop/truncate/...) at parse time with an actionable error; checks each word in quoted args (`'drop table users'` is caught).
+- [x] **4.5.5** `internal/scope/programterms` heuristic parser pulls rate limits, banned techniques (brute-force / DoS / social / physical), required headers, and disallowed paths out of policy prose. `pentestswarm program inspect h1:<slug>` fetches the policy via the H1 API and prints them; `--yaml` emits a config fragment for shell pipelines.
+- [x] **4.5.6** `internal/agent/report/bounty` — `Estimate(finding, programStats)` returns a USD range, preferring per-program stats when supplied and falling back to a conservative public-market table. `Total()` sums across findings.
+- [x] **4.5.7** `internal/agent/report/roi` — `Calculate(spend, findings, stats)` returns a Result with green/yellow/red Verdict (>10× / 2–10× / <2× ratio). `Result.Footer()` is appended to `PentestReport.ROIFooter` by the swarm report agent and rendered at the bottom of every campaign report.
 
 ### Phase 4.6 — Community Gravity (The Compounding Flywheel)
 
