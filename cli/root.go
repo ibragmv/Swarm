@@ -15,14 +15,15 @@ var (
 	verbose bool
 )
 
-// rootCmd is the base command.
+// rootCmd is the base command. The Long description is deliberately
+// short (4.8.2 — help must fit on one laptop screen).
 var rootCmd = &cobra.Command{
 	Use:   "pentestswarm",
 	Short: "Autonomous AI-Powered Penetration Testing",
-	Long: `pentestswarm is a multi-agent AI system that autonomously performs
-full-cycle penetration tests — from continuous recon through exploitation
-through professional reporting — powered by specialist AI models
-coordinated by an orchestrator agent.`,
+	Long:  `Swarms of AI agents autonomously pentest a target — recon, exploitation, reporting.`,
+	CompletionOptions: cobra.CompletionOptions{
+		HiddenDefaultCmd: true, // declutter the help output (4.8.2)
+	},
 }
 
 // Execute runs the root command.

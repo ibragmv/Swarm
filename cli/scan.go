@@ -33,9 +33,17 @@ var scanCmd = &cobra.Command{
 func runScan(cmd *cobra.Command, args []string) error {
 	target := args[0]
 
+	// Phase 4.8.5: scope-from-target. If the researcher didn't pass --scope,
+	// default to scanning only the target itself. This removes the most
+	// common reason scans fail on first run: forgetting the flag. Single-
+	// target scope is conservative (won't accidentally reach a sibling
+	// domain), so the default is safe.
 	scopeStr, _ := cmd.Flags().GetString("scope")
 	if scopeStr == "" {
-		return fmt.Errorf("--scope is required")
+		scopeStr = target
+		if !quiet {
+			fmt.Printf("  %s no --scope set, defaulting to %s\n", colorDim("[scope]"), colorBold(target))
+		}
 	}
 
 	objective, _ := cmd.Flags().GetString("objective")
@@ -72,7 +80,10 @@ func runScan(cmd *cobra.Command, args []string) error {
 	// Load config
 	cfg, err := config.Load(cfgFile)
 	if err != nil {
-		return fmt.Errorf("loading config: %w", err)
+		// 4.8.3: every error message must end with a next-step. A bare
+		// "loading config: ..." leaves the researcher guessing.
+		return fmt.Errorf("loading config: %w\n  Fix: run %s to write a fresh config",
+			err, colorCyan("pentestswarm init"))
 	}
 
 	// --safe-mode is advisory for now: the engine will consume this flag
@@ -184,7 +195,8 @@ func runScan(cmd *cobra.Command, args []string) error {
 			fmt.Println(colorRed("\nCampaign aborted by user."))
 			return nil
 		}
-		return fmt.Errorf("campaign failed: %w", err)
+		return fmt.Errorf("campaign failed: %w\n  Next: re-run with %s to abort on first error and surface the root cause",
+			err, colorCyan("--strict"))
 	}
 
 	if !quiet {
@@ -303,7 +315,9 @@ func init() {
 	scanCmd.Flags().Bool("safe-mode", false, "cap RPS + forbid destructive techniques (for programs that disallow automated scanning)")
 	scanCmd.Flags().String("auth-token", "", "authorization token")
 
-	_ = scanCmd.MarkFlagRequired("scope")
+	// Note: --scope is no longer marked required. When omitted, we default
+	// to the target itself (4.8.5: simplicity). Researchers wanting a wider
+	// scope (CIDR / wildcards / multiple domains) still pass --scope.
 
 	rootCmd.AddCommand(scanCmd)
 }
