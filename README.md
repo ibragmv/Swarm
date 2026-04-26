@@ -41,6 +41,16 @@
   <img src="banner/pentest-swarm-ai-banner.gif?v=3" alt="Pentest Swarm AI architecture" width="800">
 </p>
 
+### Built for the Mythos era
+
+Anthropic's [Claude Mythos](https://red.anthropic.com/2026/mythos-preview/) — released through [Project Glasswing](https://www.anthropic.com/glasswing) in April 2026 — surfaced thousands of zero-days across every major operating system and browser. Frontier reasoning has crossed a threshold; the bottleneck is no longer the model.
+
+**Pentest Swarm AI is the toolchain a model like that needs to operate.** Live access to nmap, sqlmap, Burp, ZAP, Metasploit, and the rest of the offensive stack. Multi-agent coordination through a stigmergic blackboard. Evidence capture, dedup, submission-ready reports. Wire in the model of your choice today — Claude Sonnet, Opus, Llama, anything OpenAI-compatible — and swap in Mythos the day access opens.
+
+*Not affiliated with Anthropic. Mythos and Glasswing are Anthropic projects.*
+
+---
+
 > ### Credits & Inspiration
 > This project stands on the shoulders of giants. We credit and thank these projects for pioneering AI-powered offensive security:
 >
