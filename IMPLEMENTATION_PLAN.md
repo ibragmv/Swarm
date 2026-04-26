@@ -266,25 +266,24 @@ Reproduce Pentest-R1 (arXiv:2508.07382) on Qwen3 or Llama 3.3 base.
 
 Publish numbers in README. Update on every release. This is how XBOW built its brand.
 
-- [ ] **3.3.1** Cybench runner (`tests/bench/cybench/`)
-  - [ ] Integrate the 40-CTF benchmark
-  - [ ] CI job: run against small subset on every PR
+- [x] **3.3.1** Cybench runner scaffold at `tests/bench/cybench/`: `Challenge` / `Result` types, `Runner` interface, `Score()` sum function, `LoadChallenges()` fails loudly until fixtures vendored. Pin shape so the next contributor can plug in a Docker sandbox + Cybench fixture loader without re-architecting.
+  - [ ] Vendor Cybench fixtures into `tests/bench/cybench/fixtures/` (gitignored)
+  - [ ] Implement Docker-sandboxed Runner (per-challenge container, mount the swarm binary)
+  - [ ] CI job to run against a small subset on every PR
 - [ ] **3.3.2** AutoPenBench runner
 - [ ] **3.3.3** CVE-Bench runner
 - [ ] **3.3.4** HackTheBox subset — retired boxes only (legal, reproducible)
 - [ ] **3.3.5** Results dashboard at `benchmarks.pentestswarm.ai` — live updated
-- [ ] **3.3.6** README table: us vs. PentestGPT / PentAGI / HexStrike / Pentest-R1
+- [x] **3.3.6** Competitor table shipped in `README.md` (Comparison section): us vs PentestGPT / HackingBuddyGPT / PentAGI / Shannon / HexStrike / Pentest-R1, columns for architecture, executes-vs-suggests, memory, tools, MCP, swarm-or-pipeline.
 
 ### Phase 3.4 — Agent Robustness (the underserved moat)
 
 Memory poisoning and inter-agent-comm attacks are real. Be the first tool to market as *hardened*.
 
-- [ ] **3.4.1** Blackboard write provenance
-  - [ ] Every finding signed by originating agent with Ed25519
-  - [ ] Tamper detection on read
-- [ ] **3.4.2** MINJA-style injection tests in test suite
+- [x] **3.4.1** `internal/swarm/provenance` — Ed25519 keypair per agent, `Sign(canonical bytes)` + `Verify(pub, sig, ...)`. Detects payload tamper AND agent-name impersonation (signing under a different keypair fails verification). Tests cover roundtrip, tamper, impersonation, malformed key/sig. Wiring through Board.Write is a follow-up.
+- [x] **3.4.2** `internal/swarm/blackboard/injection_test.go` — three MINJA tests (type-isolation, pheromone-flood clamp, MinPheromone gate). The pheromone-flood test surfaced a real defense gap: `MemoryBoard.Write` was accepting `PheromoneBase=9999`. Now clamped to [0, 1].
 - [ ] **3.4.3** MemoryGraft detection heuristics
-- [ ] **3.4.4** Rate-limit agent → agent communication
+- [x] **3.4.4** `internal/swarm/ratelimit` — per-agent token-bucket limiter, wired via `swarm.WithAgentRateLimit(name, perSec, burst)`. Defends against pathological self-feeding loops. No external deps. Agents without a configured limit are uncapped (opt-in tightening).
 - [ ] **3.4.5** Blog post: "How we hardened our swarm against memory-injection attacks" — flagship marketing piece
 
 ### Phase 3.5 — Symbolic Execution Hybrid (stretch)
