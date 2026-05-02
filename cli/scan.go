@@ -55,6 +55,7 @@ func runScan(cmd *cobra.Command, args []string) error {
 	providerOverride, _ := cmd.Flags().GetString("provider")
 	explorationBias, _ := cmd.Flags().GetString("exploration-bias")
 	publishUnverified, _ := cmd.Flags().GetBool("publish-unverified")
+	assist, _ := cmd.Flags().GetBool("assist")
 	estimate, _ := cmd.Flags().GetBool("estimate")
 	safeMode, _ := cmd.Flags().GetBool("safe-mode")
 	targetClass, _ := cmd.Flags().GetString("target-class")
@@ -169,6 +170,7 @@ func runScan(cmd *cobra.Command, args []string) error {
 		Provider:         providerOverride,
 		PublishThreshold: publishThreshold,
 		ExplorationBias: explorationBias,
+		Assist:          assist,
 	}
 
 	// Event handler for live output
@@ -183,6 +185,9 @@ func runScan(cmd *cobra.Command, args []string) error {
 	var runnerOpts []engine.Option
 	if strict, _ := cmd.Flags().GetBool("strict"); strict {
 		runnerOpts = append(runnerOpts, engine.WithStrictLLM())
+	}
+	if assist {
+		runnerOpts = append(runnerOpts, engine.WithAssistConfirmer(assistConfirm))
 	}
 	runner := engine.NewRunner(cfg, runnerOpts...)
 	useSwarm, _ := cmd.Flags().GetBool("swarm")
@@ -313,6 +318,7 @@ func init() {
 	scanCmd.Flags().Bool("estimate", false, "print expected LLM spend in USD and exit without scanning")
 	scanCmd.Flags().String("target-class", "medium", "estimate sizing: small | medium | large")
 	scanCmd.Flags().Bool("safe-mode", false, "cap RPS + forbid destructive techniques (for programs that disallow automated scanning)")
+	scanCmd.Flags().Bool("assist", false, "ask y/N before every executed step (human-in-the-loop)")
 	scanCmd.Flags().String("auth-token", "", "authorization token")
 
 	// Note: --scope is no longer marked required. When omitted, we default
