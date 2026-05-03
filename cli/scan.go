@@ -3,6 +3,7 @@ package cli
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -116,7 +117,7 @@ func runScan(cmd *cobra.Command, args []string) error {
 	}
 
 	if cfg.Orchestrator.APIKey == "" && cfg.Orchestrator.Provider == "claude" {
-		return fmt.Errorf("no API key configured.\n" +
+		return errors.New("no API key configured.\n" +
 			"  Fix one of these, then re-run:\n" +
 			"    1) " + colorCyan("pentestswarm init") + "   (one-shot interactive setup)\n" +
 			"    2) " + colorCyan("export PENTESTSWARM_ORCHESTRATOR_API_KEY=sk-ant-...") + "   (or ANTHROPIC_API_KEY)")

@@ -282,7 +282,7 @@ Memory poisoning and inter-agent-comm attacks are real. Be the first tool to mar
 
 - [x] **3.4.1** `internal/swarm/provenance` — Ed25519 keypair per agent, `Sign(canonical bytes)` + `Verify(pub, sig, ...)`. Detects payload tamper AND agent-name impersonation (signing under a different keypair fails verification). Tests cover roundtrip, tamper, impersonation, malformed key/sig. Wiring through Board.Write is a follow-up.
 - [x] **3.4.2** `internal/swarm/blackboard/injection_test.go` — three MINJA tests (type-isolation, pheromone-flood clamp, MinPheromone gate). The pheromone-flood test surfaced a real defense gap: `MemoryBoard.Write` was accepting `PheromoneBase=9999`. Now clamped to [0, 1].
-- [ ] **3.4.3** MemoryGraft detection heuristics
+- [x] **3.4.3** `internal/swarm/memorygraft` — `Scan(ctx, board, cfg)` watchdog flags four memory-graft signals: burst writes, repeat-title fingerprints, byte-identical Data payloads, and type-mismatch (an agent emitting a finding under a type owned by another agent). Pure-read; conservative defaults.
 - [x] **3.4.4** `internal/swarm/ratelimit` — per-agent token-bucket limiter, wired via `swarm.WithAgentRateLimit(name, perSec, burst)`. Defends against pathological self-feeding loops. No external deps. Agents without a configured limit are uncapped (opt-in tightening).
 - [ ] **3.4.5** Blog post: "How we hardened our swarm against memory-injection attacks" — flagship marketing piece
 
@@ -372,10 +372,10 @@ Once the tool finds real bugs, word-of-mouth does more than any marketing.
 - [ ] **4.6.1** Public findings gallery on `pentestswarm.ai` — researchers opt-in to publish a redacted writeup once the program closes the report
 - [ ] **4.6.2** Bounty leaderboard — total $ earned with the tool, self-reported with an H1 URL as proof (manual verification for now; automated via H1 webhooks later)
 - [ ] **4.6.3** Template marketplace — share + install playbooks and nuclei templates via `pentestswarm market install <slug>`. Signed + reviewed before merging into the main `armur-templates` repo
-- [ ] **4.6.4** "Assist mode" — researcher sits at the terminal; the swarm proposes each action (e.g. "run sqlmap on /search?q=?") and waits for y/N. Lower risk of breaking program relationships, and it teaches the researcher
+- [x] **4.6.4** `--assist` flag wired through `engine.WithAssistConfirmer` → `exploit.Executor.WithConfirm`. CLI prompts y/N/a (approve-all-remaining) before every executed step; bare-enter skips (fail-closed); EOF on stdin aborts the campaign. Skipped steps surface as `[SKIPPED by assist mode]` results instead of failures.
 - [ ] **4.6.5** Weekly office-hours Discord event — researchers bring their scans, we review live. Pure community signal, no marketing overlay
-- [ ] **4.6.6** "Shared FP" corpus — when researchers mark findings as FP (4.3.4), they can opt in to share the anonymised pattern to a central corpus so every other user's FP filter improves
-- [ ] **4.6.7** Per-program playbook tuning: community can contribute `playbooks/programs/<slug>.yaml` that layers program-specific knowledge on top of the base bug-bounty playbook (e.g. "Shopify programs: focus on GraphQL introspection, skip store.myshopify.com subdomain")
+- [x] **4.6.6** `internal/pipeline/fpcache.Anonymize` + `Store.ExportShare` strip target hostnames + reason free-text and SHA-256 hash a normalized title-token-set so equivalent FPs across researchers collide. `pentestswarm fp share` writes the anonymised payload to `~/.pentestswarm/fp-share.jsonl` for manual review before upload.
+- [x] **4.6.7** `internal/plugins.Overlay(base, overlay)` merges per-program tuning on top of a base playbook with structured rules: scalars overlay-wins, tags union-deduped, variables per-key, phases replace-by-name (else append), includes union-deduped. Example overlay shipped at `playbooks/programs/example.yaml`.
 
 ### Phase 4.7 — Benchmarks That Matter to Researchers
 
@@ -390,10 +390,10 @@ Not Cybench. The numbers bug-hunters actually care about.
 ### Phase 4.8 — Simplicity Guards (enforced, not aspired to)
 
 - [ ] **4.8.1** "One-command" invariant: `scan` is the only command a researcher needs. Everything else is optional polish. Any PR that adds a required step to the scan flow gets rejected.
-- [ ] **4.8.2** CLI UX budget: `pentestswarm --help` must fit on one laptop screen (≤30 lines). Deprecations go below-the-fold behind `--help --all`.
-- [ ] **4.8.3** Error messages must end with a next-step: "No API key found. Run `pentestswarm init` or set `PENTESTSWARM_ORCHESTRATOR_API_KEY`." — never just an error.
-- [ ] **4.8.4** Zero-Postgres mode: the researcher flow must work with the in-memory board. Postgres is for the server/dashboard deployment only.
-- [ ] **4.8.5** `pentestswarm scan <target>` with no scope flag infers scope from the target (single-domain scope by default) — no friction for the simple case.
+- [x] **4.8.2** Root `--help` lands at exactly 30 lines after hiding `mcp`/`config`/`explain`/`ctf` (cobra `Hidden: true` — still functional, just out of the index). `pentestswarm <hidden> --help` works as before.
+- [x] **4.8.3** Config-load + campaign-failure errors in `cli/scan.go` end with a next-step (`run pentestswarm init`, `re-run with --strict`). Audit + completion across the rest of the CLI is a follow-up.
+- [x] **4.8.4** `internal/engine/zero_postgres_test.go` pins the smoke-test invariant: `NewRunner(emptyConfig)` constructs cleanly with the in-memory cleanup registry; the swarm path uses an in-memory blackboard by default.
+- [x] **4.8.5** `cli/scan.go`: scan without `--scope` defaults to scanning the target itself, with a `[scope]` notice. Single-target scope is conservative — it can't accidentally reach a sibling domain.
 
 ---
 
