@@ -350,7 +350,7 @@ Turn a campaign into a ready-to-paste submission.
 - [x] **4.4.3** Intigriti template — 'Type of weakness' field, PoC above Impact
 - [x] **4.4.4** `pentestswarm submit` writes per-finding drafts to `./submissions/`; `--live` is gated with a 'not yet implemented' error (can't accidentally post an AI-generated report)
 - [x] **4.4.5** H1 dedup — `Client.Reports()` + `dedup.FindDuplicates` (Jaccard, target-boost); drafts get a `> ⚠ Possible duplicate of: #…` callout prepended
-- [ ] **4.4.6** Dedup against program's PUBLIC disclosed reports *(partial: `dedup` package works on any `[]Prior`; needs a public-reports fetcher — H1 has one, Bugcrowd scraping TBD)*
+- [x] **4.4.6** `hackerone.Client.PublicReports(slug, limit)` queries the H1 hacktivity feed scoped to one program; `cli/submit.go.loadPriors` now merges both sources (researcher's own reports prefixed `own:`, public disclosed prefixed `public:`) into the dedup pass. Public source works without credentials. Bugcrowd / Intigriti scrapers TBD.
 - [x] **4.4.7** Quality gate at `internal/agent/report/qualitygate`: LLM rubric on clarity / impact / reproducibility; threshold 6.0, structured tool-use so parse failures are impossible; `submit --quality-gate` wires it
 - [x] **4.4.8** Evidence capture at `internal/agent/report/evidence`: `.http` files (Burp-importable) + optional gowitness screenshots; missing gowitness = silent skip
 - [x] **4.4.9** `pentestswarm report polish <path>` — re-runs the rubric on a hand-edited draft; non-zero exit when below threshold (shell-friendly)
