@@ -284,7 +284,7 @@ Memory poisoning and inter-agent-comm attacks are real. Be the first tool to mar
 - [x] **3.4.2** `internal/swarm/blackboard/injection_test.go` — three MINJA tests (type-isolation, pheromone-flood clamp, MinPheromone gate). The pheromone-flood test surfaced a real defense gap: `MemoryBoard.Write` was accepting `PheromoneBase=9999`. Now clamped to [0, 1].
 - [x] **3.4.3** `internal/swarm/memorygraft` — `Scan(ctx, board, cfg)` watchdog flags four memory-graft signals: burst writes, repeat-title fingerprints, byte-identical Data payloads, and type-mismatch (an agent emitting a finding under a type owned by another agent). Pure-read; conservative defaults.
 - [x] **3.4.4** `internal/swarm/ratelimit` — per-agent token-bucket limiter, wired via `swarm.WithAgentRateLimit(name, perSec, burst)`. Defends against pathological self-feeding loops. No external deps. Agents without a configured limit are uncapped (opt-in tightening).
-- [ ] **3.4.5** Blog post: "How we hardened our swarm against memory-injection attacks" — flagship marketing piece
+- [x] **3.4.5** `docs/security/swarm-hardening.md` — full writeup of the four-layer defense (clamp / provenance / heuristic detector / rate limit) framed as a blog post. Doubles as the script for a BSides / Black Hat Arsenal talk once benchmark numbers land.
 
 ### Phase 3.5 — Symbolic Execution Hybrid (stretch)
 
